@@ -1,0 +1,33 @@
+# Build outputs
+build/
+bin/
+out/
+
+# Reverse engineering and memory dumps
+re/dumps/
+re/project/
+
+# Logs and trace captures
+*.log
+soulsframe.log
+bench/*.jsonl
+
+# Archives
+*.zip
+*.tar.gz
+*.7z
+
+# Cache & compile artifacts
+.cache/
+sf-ccache/
+compile_commands.json
+.ninja_deps
+.ninja_log
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
