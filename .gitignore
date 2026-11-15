@@ -2,6 +2,9 @@
 build/
 bin/
 out/
+Testing/
+smoke-result.json
+.local/
 
 # Reverse engineering and memory dumps
 re/dumps/
@@ -19,12 +22,13 @@ bench/*.jsonl
 
 # Cache & compile artifacts
 .cache/
+.clangd/
 sf-ccache/
 compile_commands.json
 .ninja_deps
 .ninja_log
 
-# IDE and OS
+# IDE & OS
 .idea/
 .vscode/
 *.swp
