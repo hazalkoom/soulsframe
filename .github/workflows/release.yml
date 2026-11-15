@@ -99,7 +99,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y wine64 xvfb unzip
           unzip -o artifacts/soulsframe-*-win64.zip -d verify_dir
-          wineboot -i || true
           bash scripts/smoke-test.sh "$PWD/verify_dir"
 
   publish-release:
