@@ -15,7 +15,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   rec.begin_frame(1);
 
   for (size_t i = 0; i + 4 <= size && i < 64; i += 4) {
-    sf::probe::DrawState st{};
+    sf::probe::DrawCallState st{};
     st.api = static_cast<sf::probe::DrawApi>(data[i] % 7);
     st.vertex_or_index_count = static_cast<uint32_t>(data[i + 1]) * 3U;
     st.caller_rva = static_cast<uint64_t>(data[i + 2]) << 8U;

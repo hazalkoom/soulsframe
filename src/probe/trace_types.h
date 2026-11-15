@@ -40,7 +40,7 @@ std::string_view pass_tag_name(PassTag tag) noexcept;
 
 /// Pure-C++ snapshot of pipeline state at a single draw, clear, or dispatch call.
 /// Deliberately holds no COM or Win32 types so trace aggregation stays Linux-testable.
-struct DrawState {
+struct DrawCallState {
   DrawApi api = DrawApi::DrawIndexed;
   uint32_t vertex_or_index_count = 0;
   uint32_t instance_count = 1;
@@ -136,7 +136,7 @@ public:
   void begin_frame(uint64_t frame_idx);
 
   /// Records a single draw, clear, or dispatch event into the active frame.
-  void record_draw(const DrawState& state);
+  void record_draw(const DrawCallState& state);
 
   /// Registers a resource once per session; returns true when newly seen.
   bool record_resource(const ResourceSummary& res);

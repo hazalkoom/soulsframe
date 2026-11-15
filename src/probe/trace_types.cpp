@@ -92,7 +92,7 @@ void TraceRecorder::begin_frame(uint64_t frame_idx) {
   pending_resources_.clear();
 }
 
-void TraceRecorder::record_draw(const DrawState& state) {
+void TraceRecorder::record_draw(const DrawCallState& state) {
   const uint64_t instances = state.instance_count == 0 ? 1U : state.instance_count;
   const uint64_t elems = static_cast<uint64_t>(state.vertex_or_index_count) * instances;
 

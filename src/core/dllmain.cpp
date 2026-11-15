@@ -8,6 +8,10 @@
 #include "games/ds3/profile.h"
 #include "gfx/d3d11/swapchain_hook.h"
 
+#ifdef SF_PROBE
+#include "probe/probe_module.h"
+#endif
+
 namespace {
 
 HMODULE g_self = nullptr;
@@ -70,6 +74,10 @@ DWORD WINAPI init_thread(LPVOID) {
          profile.engine_hooks_allowed ? "true" : "false");
 
   g_registry.register_module(std::make_unique<FrameTelemetryModule>());
+#ifdef SF_PROBE
+  g_registry.register_module(
+      std::make_unique<sf::probe::ProbeModule>(sf::log::module_dir(g_self), exe_sha));
+#endif
   g_registry.init_all(profile, cfg);
 
   for (const auto& st : g_registry.statuses()) {

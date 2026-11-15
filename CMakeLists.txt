@@ -84,6 +84,10 @@ if(NOT SF_HOST_ONLY)
     -Wl,--nxcompat
   )
   if(SF_PROBE)
+    target_sources(soulsframe PRIVATE
+      src/gfx/d3d11/context_hook.cpp
+      src/probe/probe_module.cpp
+    )
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
     target_link_libraries(soulsframe PRIVATE soulsframe_probe_core)
   endif()

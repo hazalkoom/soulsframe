@@ -33,7 +33,7 @@ TEST_CASE("JSONL event formatters produce valid structured lines") {
       .sample_count = 4,
       .is_render_target = true,
   });
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::DrawIndexed,
       .vertex_or_index_count = 150,
       .instance_count = 2,

@@ -28,14 +28,14 @@ TEST_CASE("TraceRecorder aggregates call sites and detects GPU passes") {
   rec.begin_frame(42);
 
   // Pass 1: Shadow depth-only pass after DSV clear.
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::ClearDsv,
       .rtv_signature = 0x1001,
       .rt_width = 2048,
       .rt_height = 2048,
       .rtv_count = 0,
   });
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::DrawIndexed,
       .vertex_or_index_count = 3000,
       .instance_count = 2,
@@ -50,7 +50,7 @@ TEST_CASE("TraceRecorder aggregates call sites and detects GPU passes") {
   });
 
   // Pass 2: GBuffer (3 RTVs, opaque, depth write).
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::DrawIndexed,
       .vertex_or_index_count = 1200,
       .caller_rva = 0x22000,
@@ -65,7 +65,7 @@ TEST_CASE("TraceRecorder aggregates call sites and detects GPU passes") {
 
   // Pass 3: Particles alpha pass (blended, depth-write off) from repeated call site.
   for (int i = 0; i < 4; ++i) {
-    rec.record_draw(DrawState{
+    rec.record_draw(DrawCallState{
         .api = DrawApi::DrawIndexedInstanced,
         .vertex_or_index_count = 6,
         .instance_count = 50,
@@ -81,7 +81,7 @@ TEST_CASE("TraceRecorder aggregates call sites and detects GPU passes") {
   }
 
   // Pass 4: Compute dispatch.
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::Dispatch,
       .vertex_or_index_count = 120,
       .instance_count = 1,
@@ -93,7 +93,7 @@ TEST_CASE("TraceRecorder aggregates call sites and detects GPU passes") {
   });
 
   // Pass 5: PostProcess single full-screen draw.
-  rec.record_draw(DrawState{
+  rec.record_draw(DrawCallState{
       .api = DrawApi::Draw,
       .vertex_or_index_count = 3,
       .caller_rva = 0x55000,
@@ -162,7 +162,7 @@ TEST_CASE("TraceRecorder enforces caps and deduplicates session resources") {
   CHECK(rec.record_resource(rt3) == false); // cap reached
 
   for (uint64_t i = 0; i < 4; ++i) {
-    rec.record_draw(DrawState{
+    rec.record_draw(DrawCallState{
         .api = DrawApi::Draw,
         .vertex_or_index_count = 3,
         .caller_rva = 0x100 + i,
