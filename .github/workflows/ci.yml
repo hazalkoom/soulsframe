@@ -13,7 +13,7 @@ jobs:
   guards:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run repository & layering guards
         run: bash scripts/ci/check-guards.sh
 
@@ -30,7 +30,7 @@ jobs:
           - preset: host-asan
             cxx: g++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y ninja-build cmake clang
       - run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
       - run: cmake --build --preset ${{ matrix.preset }}
@@ -45,7 +45,7 @@ jobs:
         run: |
           dnf -y install cmake ninja-build ccache git \
             mingw64-gcc-c++ mingw64-winpthreads-static mingw64-headers mingw64-crt binutils
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
@@ -80,7 +80,7 @@ jobs:
     needs: win64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: dinput8-win64
@@ -108,7 +108,7 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: DavidAnson/markdownlint-cli2-action@v16
         continue-on-error: true
         with:

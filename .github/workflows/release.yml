@@ -26,7 +26,7 @@ jobs:
           dnf -y install cmake ninja-build git binutils zip \
             mingw64-gcc-c++ mingw64-winpthreads-static mingw64-headers mingw64-crt
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure and build win64-release (clean, no cache)
         run: |
@@ -84,7 +84,7 @@ jobs:
     needs: build-and-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: release-packages
