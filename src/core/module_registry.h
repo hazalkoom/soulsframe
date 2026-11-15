@@ -26,9 +26,11 @@ public:
   void init_all(const GameProfile& profile, const Config& cfg);
 
   /// Dispatches per-frame updates to all currently active modules.
+  /// Exceptions thrown by a module disable only that module and mark its status inactive.
   void on_present(PresentCtx& ctx);
 
-  /// Shuts down active modules in reverse initialization order.
+  /// Shuts down active modules in reverse initialization order, isolating any exceptions
+  /// so remaining modules still clean up cleanly.
   void shutdown_all();
 
   /// Returns the status ledger populated by the most recent `init_all()` call.

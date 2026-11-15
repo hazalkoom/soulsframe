@@ -9,4 +9,9 @@ TEST_CASE("ds3 profile normalizes hash and guards engine hooks on unknown builds
   CHECK_FALSE(prof.engine_hooks_allowed);
   CHECK_FALSE(prof.frame_dt_ptr.has_value());
   CHECK_FALSE(prof.frame_limiter.has_value());
+
+  const auto empty_prof = sf::games::ds3::resolve_profile("");
+  CHECK(empty_prof.id == "ds3");
+  CHECK(empty_prof.exe_sha256.empty());
+  CHECK_FALSE(empty_prof.engine_hooks_allowed);
 }

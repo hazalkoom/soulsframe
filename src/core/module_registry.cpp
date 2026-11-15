@@ -42,18 +42,41 @@ void ModuleRegistry::init_all(const GameProfile& profile, const Config& cfg) {
 }
 
 void ModuleRegistry::on_present(PresentCtx& ctx) {
-  for (auto& entry : entries_) {
-    if (entry.active) {
+  for (size_t i = 0; i < entries_.size(); ++i) {
+    auto& entry = entries_[i];
+    if (!entry.active) {
+      continue;
+    }
+    // Isolate per-frame faults so a single misbehaving module cannot crash Present().
+    try {
       entry.mod->on_present(ctx);
+    } catch (...) {
+      entry.active = false;
+      if (i < statuses_.size()) {
+        statuses_[i].active = false;
+        statuses_[i].detail = "disabled after exception in on_present";
+      }
     }
   }
 }
 
 void ModuleRegistry::shutdown_all() {
-  for (auto it = entries_.rbegin(); it != entries_.rend(); ++it) {
-    if (it->active) {
-      it->mod->shutdown();
-      it->active = false;
+  for (size_t i = entries_.size(); i > 0; --i) {
+    const size_t idx = i - 1;
+    auto& entry = entries_[idx];
+    if (!entry.active) {
+      continue;
+    }
+    try {
+      entry.mod->shutdown();
+    } catch (...) {
+      if (idx < statuses_.size()) {
+        statuses_[idx].detail = "exception during shutdown";
+      }
+    }
+    entry.active = false;
+    if (idx < statuses_.size()) {
+      statuses_[idx].active = false;
     }
   }
 }

@@ -9,6 +9,13 @@ option(SF_PROBE "Build RE/telemetry features" OFF)
 option(SF_HOST_ONLY "Build only the native pure-C++ parts (tests/tools)" OFF)
 option(SF_SANITIZE "Enable Address and UndefinedBehavior sanitizers on host builds" OFF)
 option(SF_BUILD_TESTBED "Build the D3D11 smoke-testbed executable" OFF)
+option(SF_WERROR "Treat compiler warnings as errors on SoulsFrame targets" OFF)
+
+if(SF_WERROR)
+  set(SF_WARN_FLAGS -Wall -Wextra -Wpedantic -Werror)
+else()
+  set(SF_WARN_FLAGS -Wall -Wextra -Wpedantic)
+endif()
 
 include(cmake/deps.cmake)
 
@@ -23,7 +30,7 @@ add_library(soulsframe_core STATIC
   src/timing/frame_stats.cpp
 )
 target_include_directories(soulsframe_core PUBLIC src)
-target_compile_options(soulsframe_core PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})
 target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::xxhash)
 
 if(SF_HOST_ONLY AND SF_SANITIZE)
@@ -44,7 +51,7 @@ if(NOT SF_HOST_ONLY)
     OUTPUT_NAME "dinput8"
     PREFIX ""
   )
-  target_compile_options(soulsframe PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(soulsframe PRIVATE ${SF_WARN_FLAGS})
   target_link_libraries(soulsframe PRIVATE
     soulsframe_core
     minhook
@@ -60,7 +67,7 @@ if(NOT SF_HOST_ONLY)
 
   if(SF_BUILD_TESTBED)
     add_executable(d3d11_testbed tests/testbed/d3d11_testbed.cpp)
-    target_compile_options(d3d11_testbed PRIVATE -Wall -Wextra)
+    target_compile_options(d3d11_testbed PRIVATE ${SF_WARN_FLAGS})
     target_link_libraries(d3d11_testbed PRIVATE
       d3d11
       dxgi

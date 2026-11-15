@@ -9,7 +9,7 @@ add_executable(soulsframe_unit_tests
   test_sigscan.cpp
 )
 
-target_compile_options(soulsframe_unit_tests PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(soulsframe_unit_tests PRIVATE ${SF_WARN_FLAGS})
 target_link_libraries(soulsframe_unit_tests PRIVATE
   soulsframe_core
   doctest::doctest
