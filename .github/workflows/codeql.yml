@@ -1,0 +1,45 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "23 4 * * 1"
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze C++ (CodeQL)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          queries: security-extended
+
+      - name: Build host targets for CodeQL tracing
+        run: |
+          cmake --preset host-tests -DCMAKE_CXX_COMPILER=g++ -DSF_WERROR=ON
+          cmake --build --preset host-tests
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:c-cpp"

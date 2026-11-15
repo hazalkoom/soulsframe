@@ -17,12 +17,17 @@ fi
 # Wine ships a builtin dinput8.dll; force native override so our proxy loads.
 export WINEDLLOVERRIDES="dinput8=n,b;mscoree,mshtml="
 
-# 1. Verify offline guard blocks initialization when offline_acknowledged is not set.
-rm -f soulsframe.log soulsframe.toml smoke-result.json
+# Scenario 1: Offline guard must block hooks when offline_acknowledged is unset/false.
+rm -f soulsframe.log soulsframe-resize.log soulsframe-msaa.log soulsframe.toml smoke-result.json
 timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 10
 grep -q "OFFLINE GUARD BLOCKED MOD INIT" soulsframe.log
+if grep -q "Present hook installed" soulsframe.log; then
+  echo "ERROR: Hooks were installed even though offline guard blocked init!"
+  cat soulsframe.log
+  exit 1
+fi
 
-# 2. Verify live Present + ResizeBuffers hooks and frame telemetry with offline opt-in.
+# Scenario 2: Live Present + ResizeBuffers hooks and frame telemetry with offline opt-in.
 cat > soulsframe.toml <<'EOF'
 [general]
 offline_acknowledged = true
@@ -40,20 +45,32 @@ EOF
 
 rm -f soulsframe.log
 timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 300 --resize
-
 grep -q "Present hook installed" soulsframe.log
 grep -q "IDXGISwapChain::ResizeBuffers" soulsframe.log
 grep -q "avg frame time" soulsframe.log
+grep -q "Swapchain hooks removed (total_frames=300)" soulsframe.log
+cp soulsframe.log soulsframe-resize.log
+
+# Scenario 3: MSAA 4x swapchain hook verification.
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 150 --msaa 4
+grep -q "Present hook installed" soulsframe.log
+grep -q "avg frame time" soulsframe.log
+grep -q "Swapchain hooks removed (total_frames=150)" soulsframe.log
+cp soulsframe.log soulsframe-msaa.log
 
 cat > smoke-result.json <<'EOF'
 {
-  "offline_guard_blocked_without_opt_in": true,
+  "scenario_1_offline_guard_blocked": true,
+  "scenario_2_resize_300_frames_ok": true,
+  "scenario_3_msaa_4x_150_frames_ok": true,
   "present_hook_installed": true,
   "resize_buffers_hooked": true,
   "frame_telemetry_logged": true,
+  "clean_hook_shutdown": true,
   "status": "ok"
 }
 EOF
 
 rm -f soulsframe.toml
-echo "smoke OK"
+echo "smoke OK (3 scenarios)"

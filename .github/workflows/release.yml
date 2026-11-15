@@ -26,16 +26,16 @@ jobs:
           dnf -y install cmake ninja-build git binutils zip \
             mingw64-gcc-c++ mingw64-winpthreads-static mingw64-headers mingw64-crt
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure and build win64-release (clean, no cache)
         run: |
-          cmake --preset win64-release
+          cmake --preset win64-release -DSF_WERROR=ON
           cmake --build --preset win64-release
 
       - name: Configure and build win64-probe (clean, no cache)
         run: |
-          cmake --preset win64-probe
+          cmake --preset win64-probe -DSF_WERROR=ON
           cmake --build --preset win64-probe
 
       - name: Audit DLL exports and static imports
@@ -70,12 +70,12 @@ jobs:
 
           (cd artifacts && sha256sum *.zip > SHA256SUMS.txt)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-packages
           path: artifacts/*
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-testbed
           path: build/win64-release/d3d11_testbed.exe
@@ -84,7 +84,7 @@ jobs:
     needs: build-and-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: release-packages

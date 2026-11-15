@@ -166,6 +166,8 @@ void remove_swapchain_hooks() {
   if (!g_hooks_installed) {
     return;
   }
+  SF_LOG("Swapchain hooks removed (total_frames=%llu)",
+         static_cast<unsigned long long>(g_frame_index.load()));
   MH_DisableHook(MH_ALL_HOOKS);
   if (g_resize_target) {
     MH_RemoveHook(g_resize_target);

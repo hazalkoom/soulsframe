@@ -44,4 +44,50 @@ for f in "${pure_files[@]}"; do
   fi
 done
 
+# 3. Verify offline-only safety default in template config.
+if ! grep -Eq '^\s*offline_acknowledged\s*=\s*false\b' config/soulsframe.toml.example; then
+  echo "Safety violation: config/soulsframe.toml.example must default offline_acknowledged = false!"
+  exit 1
+fi
+if grep -Eq '^\s*offline_acknowledged\s*=\s*true\b' config/soulsframe.toml.example; then
+  echo "Safety violation: config/soulsframe.toml.example must never default offline_acknowledged = true!"
+  exit 1
+fi
+
+# 4. Enforce game offsets isolation: no hardcoded x64 image base RVAs outside src/games/ds3/.
+rva_leaks=$(grep -rnE '0x14[0-9a-fA-F]{7}' src/ --exclude-dir=ds3 || true)
+if [ -n "$rva_leaks" ]; then
+  echo "Offsets isolation violation: hardcoded DS3 VA outside src/games/ds3/:"
+  echo "$rva_leaks"
+  exit 1
+fi
+
+# 5. Verify pinned FetchContent tags in cmake/deps.cmake and THIRD_PARTY_LICENSES.txt coverage.
+while IFS= read -r dep; do
+  if ! grep -qi "$dep" THIRD_PARTY_LICENSES.txt; then
+    echo "License ledger missing third-party dependency: $dep"
+    exit 1
+  fi
+done < <(sed -nE 's/^\s*FetchContent_Declare\(([^[:space:])]+).*/\1/p' cmake/deps.cmake)
+
+while IFS= read -r tag; do
+  if [[ ! "$tag" =~ ^v[0-9] && ! "$tag" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "Unpinned or non-version GIT_TAG in cmake/deps.cmake: $tag"
+    exit 1
+  fi
+done < <(sed -nE 's/^\s*GIT_TAG\s+([^[:space:]]+).*/\1/p' cmake/deps.cmake)
+
+# 6. Verify every public header in src/ has at least one /// docstring comment.
+missing_docs=""
+while IFS= read -r hdr; do
+  if ! grep -q '///' "$hdr"; then
+    missing_docs+="$hdr"$'\n'
+  fi
+done < <(find src -name '*.h' | sort)
+if [ -n "$missing_docs" ]; then
+  echo "Headers missing /// docstrings:"
+  echo "$missing_docs"
+  exit 1
+fi
+
 echo "All repository guards passed."

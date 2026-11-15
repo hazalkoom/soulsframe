@@ -1,0 +1,30 @@
+name: Auto-Merge Verified PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+    if: >-
+      !github.event.pull_request.draft &&
+      (github.event.pull_request.user.login == 'dependabot[bot]' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Approve and enable auto-merge (or merge when green)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Processing PR from ${PR_AUTHOR} (${HEAD_REF}): ${PR_URL}"
+          gh pr review --approve "$PR_URL" || true
+          if ! gh pr merge --auto --squash "$PR_URL"; then
+            echo "Auto-merge requires active required checks or clean branch state; waiting for CI completion."
+          fi

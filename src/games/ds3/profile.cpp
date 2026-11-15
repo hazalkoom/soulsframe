@@ -9,8 +9,8 @@ namespace {
 
 std::string normalize_hex(std::string_view sv) {
   std::string out(sv);
-  std::transform(out.begin(), out.end(), out.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::ranges::transform(out, out.begin(),
+                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return out;
 }
 

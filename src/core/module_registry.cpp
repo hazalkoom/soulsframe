@@ -2,12 +2,15 @@
 
 #include "games/ds3/profile.h"
 
+#include <algorithm>
+
 namespace sf {
 
 void ModuleRegistry::register_module(std::unique_ptr<Module> mod) {
-  if (!mod)
+  if (!mod) {
     return;
-  entries_.push_back(Entry{std::move(mod), false});
+  }
+  entries_.push_back(Entry{.mod = std::move(mod), .active = false});
 }
 
 void ModuleRegistry::init_all(const GameProfile& profile, const Config& cfg) {
@@ -19,13 +22,15 @@ void ModuleRegistry::init_all(const GameProfile& profile, const Config& cfg) {
 
     if (!entry.mod->is_enabled(cfg)) {
       entry.active = false;
-      statuses_.push_back({mod_name, false, "disabled by config"});
+      statuses_.push_back({.name = mod_name, .active = false, .detail = "disabled by config"});
       continue;
     }
 
     if (entry.mod->requires_engine_hooks() && !profile.engine_hooks_allowed) {
       entry.active = false;
-      statuses_.push_back({mod_name, false, "refused: unknown exe hash (engine hooks disabled)"});
+      statuses_.push_back({.name = mod_name,
+                           .active = false,
+                           .detail = "refused: unknown exe hash (engine hooks disabled)"});
       continue;
     }
 
@@ -37,7 +42,7 @@ void ModuleRegistry::init_all(const GameProfile& profile, const Config& cfg) {
     }
 
     entry.active = ok;
-    statuses_.push_back({mod_name, ok, ok ? "active" : "init failed"});
+    statuses_.push_back({.name = mod_name, .active = ok, .detail = ok ? "active" : "init failed"});
   }
 }
 
@@ -82,13 +87,8 @@ void ModuleRegistry::shutdown_all() {
 }
 
 size_t ModuleRegistry::active_count() const {
-  size_t count = 0;
-  for (const auto& entry : entries_) {
-    if (entry.active) {
-      ++count;
-    }
-  }
-  return count;
+  return static_cast<size_t>(
+      std::ranges::count_if(entries_, [](const Entry& entry) { return entry.active; }));
 }
 
 } // namespace sf

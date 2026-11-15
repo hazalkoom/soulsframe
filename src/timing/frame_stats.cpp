@@ -55,7 +55,7 @@ FrameMetrics FrameStats::compute_metrics() const {
 
   m.sample_count = samples_.size();
   std::vector<double> sorted = samples_;
-  std::sort(sorted.begin(), sorted.end());
+  std::ranges::sort(sorted);
 
   const double sum = std::accumulate(sorted.begin(), sorted.end(), 0.0);
   m.avg_ms = sum / static_cast<double>(sorted.size());
@@ -75,10 +75,9 @@ FrameMetrics FrameStats::compute_metrics() const {
 
   const double median = sorted[sorted.size() / 2];
   const double spike_threshold = 2.0 * median;
-  for (double v : sorted) {
-    if (median > 1e-9 && v > spike_threshold) {
-      ++m.spike_count;
-    }
+  if (median > 1e-9) {
+    m.spike_count = static_cast<uint32_t>(
+        std::ranges::count_if(sorted, [&](double v) { return v > spike_threshold; }));
   }
 
   return m;
