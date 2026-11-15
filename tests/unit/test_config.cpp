@@ -112,6 +112,11 @@ TEST_CASE("config handles adversarial types, negative bounds, null bytes, and la
   CHECK_FALSE(nul_res.parsed_ok);
   CHECK_FALSE(nul_res.config.general.offline_acknowledged);
 
+  const std::string_view nul_header = "[general]\n[\0present]\n"sv;
+  const auto nul_header_res = sf::parse_config_toml(nul_header);
+  CHECK_FALSE(nul_header_res.parsed_ok);
+  CHECK_FALSE(nul_header_res.config.general.offline_acknowledged);
+
   // Empty and 64 KB comment/whitespace stress payloads remain valid and safe.
   const auto empty_res = sf::parse_config_toml("");
   CHECK(empty_res.parsed_ok);

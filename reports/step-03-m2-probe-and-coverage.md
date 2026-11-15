@@ -30,8 +30,8 @@ Branch: `feat/m2-probe-tracer`
 
 - `bash scripts/ci/check-guards.sh`: Passed (`All repository guards passed`).
 - `python3 tools/py/analyze_capture.py --self-test`: Passed (`analyze_capture.py self-test OK`).
-- `./build/host-cov/tests/unit/soulsframe_unit_tests`: Passed (`29/29` test cases, `673/673` assertions).
-- `SF_MIN_LINE_COVERAGE=90 bash scripts/ci/run-coverage.sh`: Passed (`lines: 96.3% (632 out of 656)`, `functions: 95.3% (61 out of 64)`, `branches: 84.2% (491 out of 583)`).
+- `./build/host-cov/tests/unit/soulsframe_unit_tests`: Passed (`29/29` test cases, `675/675` assertions).
+- `SF_MIN_LINE_COVERAGE=90 bash scripts/ci/run-coverage.sh`: Passed (`lines: 96.4% (647 out of 671)`, `functions: 95.3% (61 out of 64)`, `branches: 84.3% (494 out of 586)`).
 - `clang-format --dry-run --Werror` across all `src/` and `tests/` files (`sf-build`): Passed.
 - `win64-release` and `win64-probe` cross-compiles (`-DSF_WERROR=ON`) + `x86_64-w64-mingw32-objdump -p`: Both DLLs export `DirectInput8Create`, enforce `HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, and `NX_COMPAT`, and have zero dynamic runtime (`libstdc++`, `libgcc_s`, `libwinpthread`, `minhook`) imports.
 - 4-scenario Wine smoke suite (`sf-wine-test` + `scripts/smoke-test.sh`): Passed (`smoke OK (probe=true)`), producing 82-line `soulsframe_capture.jsonl` across 20 captured frames (`40` draw calls, `20` `particles_alpha` pass events, `DrawInstanced` + `Draw` call sites) verified by `analyze_capture.py`.

@@ -6,6 +6,7 @@
 #include <span>
 #include <sstream>
 #include <toml++/toml.hpp>
+#include <utility>
 
 namespace sf {
 
@@ -39,10 +40,10 @@ void read_clamped_u32(const toml::table& tbl, std::string_view key, std::string_
                       uint32_t min_val, uint32_t max_val, uint32_t& target,
                       std::vector<std::string>& warnings) {
   if (auto v = tbl[key].value<int64_t>()) {
-    if (*v < static_cast<int64_t>(min_val)) {
+    if (std::cmp_less(*v, min_val)) {
       target = min_val;
       warnings.emplace_back(std::string(full_name) + " clamped to " + std::to_string(min_val));
-    } else if (*v > static_cast<int64_t>(max_val)) {
+    } else if (std::cmp_greater(*v, max_val)) {
       target = max_val;
       warnings.emplace_back(std::string(full_name) + " clamped to " + std::to_string(max_val));
     } else {
@@ -58,6 +59,14 @@ void read_clamped_u32(const toml::table& tbl, std::string_view key, std::string_
 ConfigParseResult parse_config_toml(std::string_view toml_text) {
   ConfigParseResult out;
   out.config = Config::defaults();
+
+  // Reject NUL bytes before handing off to toml++ so malformed binary inputs cannot hit
+  // parser debug assertions.
+  if (toml_text.find('\0') != std::string_view::npos) {
+    out.parsed_ok = false;
+    out.warnings.emplace_back("TOML parse error: embedded NUL byte is not allowed");
+    return out;
+  }
 
   toml::table root;
   try {

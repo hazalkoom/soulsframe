@@ -100,8 +100,13 @@ void TraceRecorder::record_draw(const DrawCallState& state) {
     ++total_draw_calls_;
     total_elements_ += elems;
 
-    const CallSiteKey key{state.caller_rva, state.ps_hash, state.api, state.blend_enabled,
-                          state.depth_write};
+    const CallSiteKey key{
+        .caller_rva = state.caller_rva,
+        .ps_hash = state.ps_hash,
+        .api = state.api,
+        .blend_enabled = state.blend_enabled,
+        .depth_write = state.depth_write,
+    };
     if (auto it = call_sites_.find(key); it != call_sites_.end()) {
       ++it->second.draw_count;
       it->second.total_elements += elems;
