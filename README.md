@@ -35,6 +35,9 @@ It also ships a **reverse-engineering toolkit** (`sf-probe` inside the DLL, `sft
 | [`docs/02-dev-environment.md`](docs/02-dev-environment.md) | You want to **start coding today**: Fedora setup, containers, CMake, working skeleton, test loop. |
 | [`docs/03-reverse-engineering-toolkit.md`](docs/03-reverse-engineering-toolkit.md) | You want to find offsets, timing sources, and renderer internals. |
 | [`docs/04-optimization-playbook.md`](docs/04-optimization-playbook.md) | You want the list of optimizations, their risks, and how to measure them. |
+| [`docs/05-testing-strategy.md`](docs/05-testing-strategy.md) | You want to know how we test: unit, fuzz, shader, Wine smoke, in-game, perf regression. |
+| [`docs/06-ci-cd-github-actions.md`](docs/06-ci-cd-github-actions.md) | You want the GitHub Actions design: CI, nightly, release, security hygiene. |
+| [`docs/07-open-source-tools.md`](docs/07-open-source-tools.md) | You want the vetted list of open-source libraries/tools, licenses, and spikes. |
 
 ## Quick start (about 30 minutes to a loaded DLL)
 

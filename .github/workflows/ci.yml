@@ -1,0 +1,64 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No game files or huge blobs
+        run: |
+          bad=$(git ls-files | grep -Ei '\.(exe|dll|bdt|bhd|dcx|tpf|bnd|fxr|zip)$' || true)
+          [ -z "$bad" ] || { echo "Forbidden files tracked:"; echo "$bad"; exit 1; }
+          big=$(git ls-files -z | xargs -0 du -k | awk '$1 > 5120 {print $2}')
+          [ -z "$big" ] || { echo "Files over 5 MB:"; echo "$big"; exit 1; }
+
+  host-tests:
+    needs: guards
+    if: hashFiles('CMakePresets.json') != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cxx: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build cmake clang
+      - run: cmake --preset host-tests -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - run: cmake --build --preset host-tests
+      - run: ctest --preset host-tests
+
+  win64:
+    needs: guards
+    if: hashFiles('CMakePresets.json') != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-mingw-w64-x86-64 ccache
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-win64-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+          restore-keys: ccache-win64-
+      - run: cmake --preset win64-release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+      - run: cmake --build --preset win64-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dinput8-win64
+          path: build/win64-release/dinput8.dll
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v16
+        continue-on-error: true
+        with:
+          globs: "**/*.md"

@@ -104,6 +104,7 @@ Effort figures assume part-time solo work. Treat them as rough.
 Order matters: M2-M4 are what turn guessing into engineering. Skip them and every later milestone costs more.
 
 ### Acceptance rules for every milestone
+- Passes the CI pipeline and the testing definition of done (`docs/05` §8, `docs/06`).
 - Works on **real Windows**, not only under Proton/DXVK. DXVK changes timing and some behavior.
 - A **kill switch** exists (config key or hotkey) that disables the feature at runtime.
 - A **before/after capture** is stored in `bench/`.
