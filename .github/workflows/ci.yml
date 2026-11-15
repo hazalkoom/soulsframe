@@ -46,7 +46,7 @@ jobs:
           dnf -y install cmake ninja-build ccache git \
             mingw64-gcc-c++ mingw64-winpthreads-static mingw64-headers mingw64-crt binutils
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
           key: ccache-win64-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
