@@ -231,6 +231,7 @@ jobs:
             build/win64-release/dinput8.dll
             build/win64-release/d3d11_testbed.exe
             build/win64-probe/dinput8.dll
+            build/win64-probe/d3d11_testbed.exe
 
   wine-smoke:
     needs: win64
@@ -251,7 +252,8 @@ jobs:
           WINEDEBUG: -all
           WINEDLLOVERRIDES: "dinput8=n,b;mscoree,mshtml="
         run: |
-          bash scripts/smoke-test.sh "$PWD/build/win64-release"
+          bash scripts/smoke-test.sh "$PWD/build/win64-release" "$PWD/build/win64-probe"
+          python3 tools/py/analyze_capture.py build/win64-probe/soulsframe_capture.jsonl
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -261,6 +263,8 @@ jobs:
             build/win64-release/soulsframe-resize.log
             build/win64-release/soulsframe-msaa.log
             build/win64-release/smoke-result.json
+            build/win64-probe/soulsframe.log
+            build/win64-probe/soulsframe_capture.jsonl
 
   docker-verify:
     needs: guards

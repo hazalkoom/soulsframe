@@ -6,6 +6,7 @@
 #include "gfx/d3d11/context_hook.h"
 #include "probe/jsonl_writer.h"
 
+#include <chrono>
 #include <filesystem>
 #include <utility>
 #include <vector>
@@ -53,6 +54,7 @@ bool ProbeModule::init(const sf::GameProfile& profile, const sf::Config& cfg) {
     std::lock_guard lk(queue_mu_);
     pending_lines_.clear();
     writer_stop_ = false;
+    writer_done_.store(false, std::memory_order_release);
     pending_lines_.push_back(format_session_header(hdr));
   }
   writer_thread_ = std::thread(&ProbeModule::writer_loop, this);
@@ -97,9 +99,11 @@ void ProbeModule::on_present(sf::PresentCtx& ctx) {
     }
   }
 
-  enqueue_lines(serialize_frame_snapshot(snap, ctx.delta_ms));
+  enqueue_lines(serialize_frame_snapshot(snap, ctx.delta_ms), hit_limit);
 
   if (hit_limit) {
+    // Joining from Present (outside DllMain loader lock) finalizes the capture cleanly.
+    stop_writer(false);
     SF_LOG("ProbeModule reached capture_frames limit (%u); trace finalized -> %s", count_after,
            output_path_.c_str());
   }
@@ -108,20 +112,9 @@ void ProbeModule::on_present(sf::PresentCtx& ctx) {
 void ProbeModule::shutdown() {
   capture_stopped_.store(true, std::memory_order_release);
   gfx::remove_context_hooks();
-
-  if (writer_thread_.joinable()) {
-    {
-      std::lock_guard lk(queue_mu_);
-      writer_stop_ = true;
-    }
-    queue_cv_.notify_all();
-    writer_thread_.join();
-  }
-
-  if (out_stream_.is_open()) {
-    out_stream_.flush();
-    out_stream_.close();
-  }
+  // shutdown() runs during DLL_PROCESS_DETACH under the OS loader lock: wait for the
+  // writer stream flush via writer_done_ and detach instead of calling thread::join().
+  stop_writer(true);
 }
 
 void ProbeModule::on_draw_trampoline(const DrawCallState& state, void* user) {
@@ -152,17 +145,43 @@ void ProbeModule::record_resource_event(const ResourceSummary& resource) {
   recorder_.record_resource(resource);
 }
 
-void ProbeModule::enqueue_lines(std::vector<std::string> lines) {
-  if (lines.empty()) {
-    return;
-  }
+void ProbeModule::enqueue_lines(std::vector<std::string> lines, bool finalize_after) {
   {
     std::lock_guard lk(queue_mu_);
     for (auto& line : lines) {
       pending_lines_.push_back(std::move(line));
     }
+    if (finalize_after) {
+      writer_stop_ = true;
+    }
   }
   queue_cv_.notify_one();
+}
+
+void ProbeModule::stop_writer(bool wait_without_join) {
+  if (!writer_thread_.joinable()) {
+    if (out_stream_.is_open()) {
+      out_stream_.flush();
+      out_stream_.close();
+    }
+    return;
+  }
+
+  {
+    std::lock_guard lk(queue_mu_);
+    writer_stop_ = true;
+  }
+  queue_cv_.notify_all();
+
+  if (wait_without_join) {
+    for (int i = 0; i < 250 && !writer_done_.load(std::memory_order_acquire); ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    writer_thread_.detach();
+    return;
+  }
+
+  writer_thread_.join();
 }
 
 void ProbeModule::writer_loop() {
@@ -183,6 +202,12 @@ void ProbeModule::writer_loop() {
     out_stream_.flush();
     batch.clear();
   }
+
+  if (out_stream_.is_open()) {
+    out_stream_.flush();
+    out_stream_.close();
+  }
+  writer_done_.store(true, std::memory_order_release);
 }
 
 } // namespace sf::probe

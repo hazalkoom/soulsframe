@@ -39,7 +39,8 @@ private:
 
   void record_draw_event(const DrawCallState& state);
   void record_resource_event(const ResourceSummary& resource);
-  void enqueue_lines(std::vector<std::string> lines);
+  void enqueue_lines(std::vector<std::string> lines, bool finalize_after);
+  void stop_writer(bool wait_without_join);
   void writer_loop();
 
   std::string output_dir_;
@@ -49,6 +50,7 @@ private:
   uint32_t max_capture_frames_ = 120;
   uint32_t captured_frames_ = 0;
   std::atomic<bool> capture_stopped_{false};
+  std::atomic<bool> writer_done_{false};
 
   std::mutex trace_mu_;
   TraceRecorder recorder_;
