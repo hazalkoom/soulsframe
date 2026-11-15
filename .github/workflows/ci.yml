@@ -84,7 +84,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: dinput8-win64
-          path: build/win64-release
+          path: build
       - name: Install Wine and Xvfb
         run: |
           sudo dpkg --add-architecture i386
@@ -95,7 +95,6 @@ jobs:
           WINEDEBUG: -all
           WINEDLLOVERRIDES: "dinput8=n,b;mscoree,mshtml="
         run: |
-          wineboot -i || true
           bash scripts/smoke-test.sh "$PWD/build/win64-release"
       - uses: actions/upload-artifact@v4
         if: always()
