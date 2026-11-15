@@ -1,0 +1,18 @@
+# SoulsFrame configuration
+# Copy next to DarkSoulsIII.exe / dinput8.dll as "soulsframe.toml".
+
+[general]
+# REQUIRED: SoulsFrame is offline-only. Using DLL hooks online risks account bans.
+# Set to true to confirm you are launching Dark Souls III offline.
+offline_acknowledged = false
+mod_enabled = true
+log_level = "info"
+
+[present]
+# "game" = leave swap chain as DS3 creates it; "flip" = planned M5 flip-model experiment
+mode = "game"
+max_fps = 0
+
+[modules]
+frame_telemetry = true
+presentation = false
