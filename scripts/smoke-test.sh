@@ -4,12 +4,12 @@ set -euo pipefail
 BUILD_DIR="${1:-/src/build/win64-release}"
 cd "$BUILD_DIR"
 
-# Prevent Wine from writing .local/share entries into the mounted source tree.
-export HOME="/tmp"
-mkdir -p /tmp/.local/share
+# Prevent Wine from writing .local/share entries into the mounted source tree
+# and ensure both HOME and WINEPREFIX live in directories owned by the current UID.
+export HOME="/tmp/sf-home"
+mkdir -p "$HOME/.local/share"
 
-# If container /wine is owned by root under --userns=keep-id, use a per-UID prefix.
-if [ -d "${WINEPREFIX:-/wine}" ] && [ ! -O "${WINEPREFIX:-/wine}" ]; then
+if [ -z "${WINEPREFIX:-}" ] || [ ! -d "${WINEPREFIX}" ] || [ ! -O "${WINEPREFIX}" ]; then
   export WINEPREFIX="/tmp/sf-wine-prefix"
   mkdir -p "$WINEPREFIX"
 fi
