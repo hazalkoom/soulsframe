@@ -35,6 +35,7 @@ target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})
 target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::xxhash)
 
 add_library(soulsframe_probe_core STATIC
+  src/probe/jsonl_writer.cpp
   src/probe/trace_types.cpp
 )
 target_include_directories(soulsframe_probe_core PUBLIC src)

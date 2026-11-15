@@ -52,6 +52,7 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp
@@ -76,6 +77,7 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp
@@ -158,7 +160,7 @@ jobs:
             -DCMAKE_C_FLAGS="-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
             -DSF_WERROR=ON
-          cmake --build build/host-fuzz --target soulsframe_core
+          cmake --build build/host-fuzz --target soulsframe_core soulsframe_probe_core
       - name: Build and run libFuzzer targets (10s each)
         run: |
           clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
@@ -171,8 +173,15 @@ jobs:
             tests/fuzz/fuzz_sigscan.cpp \
             build/host-fuzz/libsoulsframe_core.a build/host-fuzz/_deps/xxhash-build/libxxhash.a \
             -o build/host-fuzz/fuzz_sigscan
+          clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc \
+            tests/fuzz/fuzz_probe_jsonl.cpp \
+            build/host-fuzz/libsoulsframe_probe_core.a build/host-fuzz/libsoulsframe_core.a \
+            build/host-fuzz/_deps/xxhash-build/libxxhash.a \
+            -o build/host-fuzz/fuzz_probe_jsonl
           ./build/host-fuzz/fuzz_config tests/fuzz/corpus/config -max_total_time=10
           ./build/host-fuzz/fuzz_sigscan tests/fuzz/corpus/sigscan -max_total_time=10
+          ./build/host-fuzz/fuzz_probe_jsonl tests/fuzz/corpus/probe_jsonl -max_total_time=10
 
   win64:
     needs: guards
