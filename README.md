@@ -40,7 +40,8 @@ It also ships a **reverse-engineering toolkit** (`sf-probe` inside the DLL, `sft
 | [`docs/07-open-source-tools.md`](docs/07-open-source-tools.md) | You want the vetted list of open-source libraries/tools, licenses, and spikes. |
 | [`docs/08-logging-and-telemetry.md`](docs/08-logging-and-telemetry.md) | You want the runtime logging, JSONL capture schema, and extraction plan. |
 | [`docs/09-codebase-reference.md`](docs/09-codebase-reference.md) | You want a file-by-file map of every module and symbol implemented so far. |
-| [`docs/guide-for-vibe-coders.md`](docs/guide-for-vibe-coders.md) | You want a plain-English walkthrough of how the mod works without deep C++/DirectX jargon. |
+| [`docs/guide-for-vibe-coders.md`](docs/guide-for-vibe-coders.md) | You want a quick plain-English tour of how the mod works without deep C++/DirectX jargon. |
+| [`docs/10-deep-dive-for-learners-and-vibe-coders.md`](docs/10-deep-dive-for-learners-and-vibe-coders.md) | You want a zero-to-systems masterclass explaining DLL proxying, COM vtables, MinHook, harsh CI, safe recipes, and career leverage. |
 | [`AGENTS.md`](AGENTS.md) | You are (or are prompting) an AI coding agent working in this repository. |
 
 ## Quick start (about 30 minutes to a loaded DLL)

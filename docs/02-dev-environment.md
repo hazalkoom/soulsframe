@@ -21,6 +21,7 @@ Things to install by hand (no dnf package): **Ghidra** (zip from GitHub releases
 **Docker instead of podman:** `export CTR=docker`. Add yourself to the `docker` group. On Fedora with SELinux, bind mounts need the `:Z` suffix (already in the justfile).
 
 ### IDE
+
 - **CLion** is the JetBrains C++ IDE. IntelliJ IDEA has no first-class C++ support. CLion has a free non-commercial license at the time of writing (check current terms).
 - Point CLion at the CMake presets and use the container toolchain (*Settings → Build → Toolchains → + Docker*), or just run `just build` in a terminal and use CLion for editing/navigation.
 - Alternative: VS Code + `clangd` + `CMake Tools`. Generate `compile_commands.json` (the presets below do this).
@@ -28,7 +29,7 @@ Things to install by hand (no dnf package): **Ghidra** (zip from GitHub releases
 
 ## 2. Repository layout
 
-```
+```text
 soulsframe/
 ├── CMakeLists.txt
 ├── CMakePresets.json
@@ -66,6 +67,7 @@ soulsframe/
 ## 3. Containers
 
 ### `docker/build.Dockerfile` (cross-compiler)
+
 ```dockerfile
 FROM fedora:43
 RUN dnf -y install cmake ninja-build ccache git python3 clang-tools-extra \
@@ -74,9 +76,11 @@ RUN dnf -y install cmake ninja-build ccache git python3 clang-tools-extra \
 ENV CCACHE_DIR=/ccache
 WORKDIR /src
 ```
+
 `fedora:43` is a placeholder. Pin whichever Fedora release you actually run.
 
 ### `docker/ghidra.Dockerfile` (headless RE batch jobs)
+
 ```dockerfile
 FROM eclipse-temurin:21-jdk
 ARG GHIDRA_URL            # full URL of the release zip from GitHub, passed at build time
@@ -86,9 +90,11 @@ RUN curl -fsSL "$GHIDRA_URL" -o /tmp/g.zip && unzip -q /tmp/g.zip -d /opt \
 ENV PATH="/opt/ghidra/support:${PATH}"
 WORKDIR /work
 ```
+
 Use the **GUI natively** for interactive work (GUI in containers is painful). Use the container for **repeatable batch analysis** and CI exports. Check the Ghidra release notes for the JDK version it requires.
 
 ### `docker/wine-test.Dockerfile` (smoke tests, no GPU needed)
+
 ```dockerfile
 FROM fedora:43
 RUN dnf -y install wine xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers mesa-libGL \
@@ -97,13 +103,16 @@ ENV WINEPREFIX=/wine WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
 RUN xvfb-run -a wineboot -i || true
 WORKDIR /test
 ```
+
 Wine's built-in D3D11 (wined3d) on llvmpipe software GL is enough to prove "DLL loads, hook installs, frames pass through `Present`". It won't tell you anything about performance.
 
 ### `docker/dotnet-tools.Dockerfile`
+
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:8.0
 WORKDIR /work
 ```
+
 Used for the `tools/bake` project (SoulsFormats) to unpack/re-pack texture archives and later FXR files on the host's own game copy.
 
 **Game files never go into images.** Mount your Steam folder read-only at run time.
@@ -151,6 +160,7 @@ clean:
 ## 5. Build files and a working skeleton
 
 ### `cmake/toolchains/mingw-w64-x86_64.cmake`
+
 ```cmake
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
@@ -165,6 +175,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 ```
 
 ### `CMakePresets.json`
+
 ```json
 {
   "version": 6,
@@ -192,6 +203,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 ```
 
 ### `cmake/deps.cmake`
+
 ```cmake
 include(FetchContent)
 FetchContent_Declare(minhook
@@ -200,9 +212,11 @@ FetchContent_Declare(minhook
 FetchContent_MakeAvailable(minhook)
 # Add later, pinned the same way: tomlplusplus, spdlog, zydis, cpp-httplib, doctest, imgui
 ```
+
 Rule: always a tag or commit hash, never a branch name. Two weeks of "it worked yesterday" is not worth it.
 
 ### `CMakeLists.txt`
+
 ```cmake
 cmake_minimum_required(VERSION 3.25)
 project(soulsframe LANGUAGES C CXX)
@@ -233,6 +247,7 @@ endif()
 ```
 
 ### `src/core/log.h` / `log.cpp`
+
 ```cpp
 // log.h
 #pragma once
@@ -242,6 +257,7 @@ void write(const char* fmt, ...);
 }
 #define SF_LOG(...) ::sf::log::write(__VA_ARGS__)
 ```
+
 ```cpp
 // log.cpp
 #include "core/log.h"
@@ -267,6 +283,7 @@ void write(const char* fmt, ...) {
 ```
 
 ### `src/core/proxy_dinput8.cpp` (forwards the one function the game needs)
+
 ```cpp
 #include <windows.h>
 namespace {
@@ -289,6 +306,7 @@ HRESULT WINAPI DirectInput8Create(HINSTANCE h, DWORD ver, const GUID& riid, LPVO
 ```
 
 ### `src/core/dllmain.cpp`
+
 ```cpp
 #include <windows.h>
 #include "core/log.h"
@@ -312,11 +330,13 @@ BOOL APIENTRY DllMain(HINSTANCE h, DWORD reason, LPVOID) {
 ```
 
 ### `src/gfx/d3d11/swapchain_hook.h` / `.cpp`
+
 ```cpp
 // swapchain_hook.h
 #pragma once
 namespace sf::gfx { bool install_present_hook(); }
 ```
+
 ```cpp
 // swapchain_hook.cpp
 #include "gfx/d3d11/swapchain_hook.h"
@@ -373,10 +393,12 @@ bool install_present_hook() {
 }
 }
 ```
+
 Later (M2+): also hook `IDXGISwapChain::ResizeBuffers` (slot 13) and `IDXGIFactory::CreateSwapChain` so you see the *game's* swap-chain parameters, and hook the `ID3D11DeviceContext` vtable (shared across immediate and deferred contexts, so one hook set covers both).
 
 ### `.gitignore` (essentials)
-```
+
+```text
 build/
 re/dumps/
 *.log
@@ -390,6 +412,7 @@ just build && just deploy
 #   WINEDLLOVERRIDES="dinput8=n,b" PROTON_LOG=1 %command%
 just log        # tail soulsframe.log
 ```
+
 - Proton log: `~/steam-374320.log` (`374320` is DS3's Steam app id).
 - DXVK overlay for sanity: add `DXVK_HUD=fps,frametimes` to launch options.
 - Prefix location: `~/.local/share/Steam/steamapps/compatdata/374320/pfx`.
@@ -411,6 +434,7 @@ grep -q "Present hook installed" soulsframe.log
 grep -q "avg frame time" soulsframe.log
 echo "smoke OK"
 ```
+
 It proves hook installation and no crash. It says nothing about performance or visuals.
 
 ## 8. Debugging recipes
@@ -446,6 +470,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: cmake --preset host-tests && cmake --build --preset host-tests && ctest --preset host-tests
 ```
+
 Add the Wine smoke test as a third job once M1 is green.
 
 ## 9b. Other tools worth having

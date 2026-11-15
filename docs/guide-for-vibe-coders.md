@@ -1,6 +1,8 @@
 # SoulsFrame guide for vibe coders (plain-English tour)
 
-Don't worry if you aren't a C++ or DirectX systems programmer. This guide explains what **SoulsFrame** is doing under the hood, why the project is organized the way it is, and how to safely collaborate with AI coding agents on it.
+Don't worry if you aren't a C++ or DirectX systems programmer. This guide gives you a fast orientation to what **SoulsFrame** is doing under the hood, why it is layered safely, and how to collaborate with AI coding agents on it.
+
+> Want to go deeper? Read [docs/10-deep-dive-for-learners-and-vibe-coders.md](10-deep-dive-for-learners-and-vibe-coders.md) for visual step-by-step explanations of DLL proxying, COM vtables, function hooking, harsh CI gates, contribution recipes, and career skill leverage.
 
 ## 1. What are we actually building?
 
@@ -8,7 +10,7 @@ Normally, when **Dark Souls III** starts on Windows (or Proton on Linux), it ask
 
 SoulsFrame creates its own fake `dinput8.dll` that sits right next to `DarkSoulsIII.exe`:
 
-```
+```text
   DarkSoulsIII.exe
         │
         ├──► asks for DirectInput ──► Our dinput8.dll ──► forwards to real Windows dinput8.dll
@@ -62,6 +64,8 @@ Every AI agent automatically reads `AGENTS.md`, which teaches it our safety rule
 - *"Add a `[modules]` setting for X in `config.h` and write a doctest unit test for it in `tests/unit/test_config.cpp`."*
 - *"Run `host-tests` and `scripts/ci/check-guards.sh` to verify nothing broke."*
 - *"Update `reports/` explaining what you changed in plain English."*
+
+Every pull request and push is protected by strict automated checks (`scripts/ci/check-guards.sh`, `clang-format`, `clang-tidy --warnings-as-errors`, `cppcheck`, CodeQL, `gitleaks`, `-Werror` unit tests with 605 assertions, and a 3-scenario Wine DirectX 11 test). Even if an experiment breaks something, CI catches it immediately before anything merges into `main`.
 
 ## 6. Things you should NOT ask an AI to put in Git
 

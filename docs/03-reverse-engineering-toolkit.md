@@ -46,6 +46,7 @@ The on-disk `DarkSoulsIII.exe` is protected by anti-tamper/obfuscation (Arxan-st
 Expect some code regions to still be encrypted/unpacked lazily, so dump again later (after loading into a map) and diff.
 
 ### `sf-probe dump` design
+
 - Enumerate the module's sections via `VirtualQuery` across `[base, base+SizeOfImage)`.
 - Copy committed pages; zero-fill reserved/guard pages.
 - Write headers + sections with the fix-ups above.
@@ -65,6 +66,7 @@ podman run --rm --userns=keep-id -v $PWD:/work:Z sf-ghidra \
     -scriptPath /work/re/ghidra_scripts \
     -postScript ExportSymbols.java /work/re/db/ds3_functions.json
 ```
+
 - Raise the JVM heap in `support/launch.properties` (`MAXMEM`) for a big binary.
 - `re/ghidra_scripts/` holds scripts: `ExportSymbols` (named functions → JSON), `ApplyOffsetsDb` (push your known names/offsets into a fresh analysis), `FindXrefsTo` (batch xref queries).
 - Commit **scripts and exported JSON/notes**, not the Ghidra project or binaries.
@@ -72,7 +74,9 @@ podman run --rm --userns=keep-id -v $PWD:/work:Z sf-ghidra \
 ## 5. Techniques
 
 ### 5.1 D3D11 as a Rosetta stone (API-anchored RE)
+
 You can't read the engine yet, but you can see exactly when it calls D3D11. So:
+
 1. Hook the `ID3D11DeviceContext` methods (see §6).
 2. On each draw/state call, capture the **return address** and a short stack (`RtlCaptureStackBackTrace`).
 3. Map those addresses into RVAs of the main module (`addr - module_base`).
@@ -82,17 +86,20 @@ You can't read the engine yet, but you can see exactly when it calls D3D11. So:
 This is the fastest way to bridge "I saw something in RenderDoc" to "this is the function."
 
 ### 5.2 Time-API tracing (find the limiter and dt)
+
 Hook, from the probe, the functions a frame loop uses to measure and wait, and log callers:
 `QueryPerformanceCounter`, `GetTickCount64`, `timeGetTime`, `Sleep`, `SleepEx`, `WaitForSingleObject(Ex)`, `WaitForMultipleObjects`, `NtDelayExecution`, plus `IDXGISwapChain::Present`'s sync interval.
 Aggregate by caller RVA and call rate. The caller that fires once per frame and feeds a subtraction is your dt source; the one that blocks for the remainder of 16.67 ms is the limiter.
 
 ### 5.3 Value tracing (Cheat Engine / PINCE / x64dbg)
+
 - Scan for a float near `0.016667` (or `1/60`) that changes each frame → candidate dt.
 - "Find what accesses/writes" → which instructions touch it → Ghidra.
 - Use **hardware breakpoints** where possible so you don't modify code bytes, which matters with integrity checks.
 - Log every consumer of dt (animation, physics, durability, status effects, camera). That list is the real FPS-unlock work plan.
 
 ### 5.4 Signature scanning and the offsets DB
+
 - **Never hardcode raw addresses.** Use signature patterns + RVA fallback keyed by exe hash.
 - `sftool sigmaker --image dump.exe --rva 0x1A2B3C`:
   1. Decode instructions with Zydis from the RVA.
@@ -116,6 +123,7 @@ notes       = "reads float dt from global; 1 write site in main loop"
 ```
 
 ### 5.5 Findings records (so RE is reproducible)
+
 Every RE claim gets a note in `re/notes/<topic>.md`:
 
 ```md
@@ -132,6 +140,7 @@ Every RE claim gets a note in `re/notes/<topic>.md`:
 ## 6. `sf-probe`: the in-DLL tooling (build with `-DSF_PROBE=ON`)
 
 ### 6.1 D3D11 tracer
+
 Hook (vtable patch or MinHook on the shared vtable entries; one set covers immediate + deferred contexts):
 
 - **Context:** `Draw*`, `Dispatch*`, `OMSetRenderTargets*`, `OMSetBlendState`, `OMSetDepthStencilState`, `RSSetViewports`, `RSSetState`, `PSSetShader`, `VSSetShader`, `PSSetShaderResources`, `PSSetConstantBuffers`, `Map/Unmap`, `UpdateSubresource`, `ClearRenderTargetView`, `ClearDepthStencilView`, `CopyResource`, `CopySubresourceRegion`, `ResolveSubresource`, `GenerateMips`.
@@ -141,23 +150,28 @@ Hook (vtable patch or MinHook on the shared vtable entries; one set covers immed
 Rules: per-thread ring buffers (draws can come from several threads), merge at `Present`, never block the render thread on file I/O (flush on a worker).
 
 **Per-frame record (JSON lines):**
+
 ```json
 {"frame": 1042, "passes": [
   {"id": 7, "rt": ["R11G11B10_FLOAT 1920x1080"], "depth": "D32 ro", "draws": 312,
    "blend": "additive", "callsites": [{"rva": "0x1A2B3C", "draws": 300}], "gpu_ms": 2.41}
 ]}
 ```
+
 **Pass boundary** = change of render-target set (or depth target) between draws. Good enough to start; refine with explicit clears.
 
 ### 6.2 GPU timing
+
 `ID3D11Query` `TIMESTAMP_DISJOINT` per frame + `TIMESTAMP` at pass boundaries. Read results 2-3 frames later to avoid stalling. Timing resolution and reliability vary across Wine/DXVK vs. native drivers, so trust Windows numbers.
 
 ### 6.3 Resource & shader registries
+
 - Track every texture: size, format, mips, usage, bind flags, content hash of mip 0 (xxh3), creation callsite RVA, bind counts per frame.
 - Track every shader by DXBC hash. Dump `.dxbc` and a text disassembly (`D3DDisassemble` from `d3dcompiler_47.dll`, in-process, so no external tools) into `dump/shaders/<hash>.{dxbc,txt}`.
 - **Override directory** `override/shaders/<hash>.{dxbc,hlsl}`: loaded at `CreatePixelShader` time. This is the same idea as 3DMigoto/Special K, and it's how you test "cheaper variant of the fog shader" in minutes.
 
 ### 6.4 Remote inspector (leans on your backend skills)
+
 - Embed a small HTTP/WebSocket server in the DLL (header-only lib such as `cpp-httplib`; localhost only, off by default, random token in the log).
 - JSON endpoints: `/frame/latest`, `/passes`, `/resources`, `/shaders`, `/hooks`, `/config` (GET/PUT), `/dump/module`, `/capture?frames=60`, `/toggle/<module>`.
 - Build the UI in whatever you like (Node + a tiny React/htmx page, or a Python Streamlit app): flame-style pass timeline, resource browser, live parameter sliders.
@@ -165,6 +179,7 @@ Rules: per-thread ring buffers (draws can come from several threads), merge at `
 - Why: in-game overlays need input capture, which is a rabbit hole (DS3 reads input via its own paths). An external UI avoids that.
 
 ### 6.5 Hot reload
+
 Watch `override/` and `soulsframe.toml` (`ReadDirectoryChangesW`) and apply on change. Shader iteration should take seconds, not rebuilds.
 
 ## 7. `sftool` (host-native C++ + Python)

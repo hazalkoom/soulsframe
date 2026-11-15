@@ -93,6 +93,7 @@ Kept at `docs/checklists/`. Each release candidate must pass:
 ## 8. Definition of done (testing)
 
 A change merges when:
+
 - L0, L1 (normal + ASan/UBSan) and L4 pass in CI.
 - New logic has a unit test or a written reason why not.
 - Rendering/timing changes attach a before/after capture or screenshot diff.

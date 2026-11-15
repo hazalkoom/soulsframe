@@ -3,11 +3,13 @@
 ## 1. Goals and non-goals
 
 **Goals**
+
 - A DS3 (x64, D3D11) mod that improves frame-time consistency, GPU cost in worst-case scenes, and optionally resolution/FPS.
 - A reusable instrumentation and RE toolkit so the work is evidence-driven.
 - A code structure where Elden Ring can be added without a rewrite of the non-graphics layers.
 
 **Non-goals (for now)**
+
 - DS1/DS2 support.
 - Online play support.
 - Competing with driver-level frame generation (AFMF) or Lossless Scaling. Frame generation is a research spike only.
@@ -31,7 +33,7 @@
 
 ## 3. Architecture
 
-```
+```text
           DarkSoulsIII.exe  ──loads──►  dinput8.dll (SoulsFrame)
                                           │
    ┌───────────────┬───────────────┬──────┴───────┬────────────────┐
@@ -51,12 +53,14 @@
 ```
 
 ### Layering rules
+
 1. `games/ds3/` is the **only** place with offsets, signatures, and engine struct layouts.
 2. `gfx/d3d11/` knows D3D11 and nothing about DS3. DS3-specific heuristics (for example "which pass is particles") live in `games/ds3/render.cpp` and are passed in as a `RenderProfile`.
 3. `probe/` is compiled only with `-DSF_PROBE=ON`. The release DLL carries none of it.
 4. Any logic that can be pure (hashing, DDS parsing, signature matching, config) must be testable natively on Linux with no Win32.
 
 ### Module lifecycle
+
 Every feature is a `Module` registered in `module_registry`:
 
 ```cpp
@@ -67,6 +71,7 @@ struct Module {
   virtual void shutdown() = 0;                               // remove hooks
 };
 ```
+
 Modules fail independently: if a sigscan fails, log it, disable only that module, and keep the game running.
 
 ### GameProfile (the Elden Ring seam)
@@ -81,6 +86,7 @@ struct GameProfile {
   RenderProfile render;                   // heuristics for pass detection
 };
 ```
+
 `games/ds3/profile.cpp` fills this in. Unknown exe hash means **don't hook engine code**, only run the safe D3D layer and telemetry.
 
 ## 4. Milestones
@@ -104,6 +110,7 @@ Effort figures assume part-time solo work. Treat them as rough.
 Order matters: M2-M4 are what turn guessing into engineering. Skip them and every later milestone costs more.
 
 ### Acceptance rules for every milestone
+
 - Passes the CI pipeline and the testing definition of done (`docs/05` §8, `docs/06`).
 - Works on **real Windows**, not only under Proton/DXVK. DXVK changes timing and some behavior.
 - A **kill switch** exists (config key or hotkey) that disables the feature at runtime.
@@ -124,11 +131,13 @@ Order matters: M2-M4 are what turn guessing into engineering. Skip them and ever
 ## 6. Elden Ring prep (do now, build later)
 
 Facts to plan around (verify when you start):
+
 - ER is **D3D12**, not D3D11. `gfx/d3d11/` does not port. You'll add `gfx/d3d12/` with its own hooks (command queue/list, `Present` on the DXGI side).
 - ER uses **Easy Anti-Cheat**; modding means launching without it and therefore offline only.
 - Engine lineage is shared (DS3 → Sekiro → ER), so *ideas* transfer: time sources, param/settings structs, FXR particle format. *Offsets* don't.
 
 What to do in DS3 code so ER is cheap later:
+
 1. Keep `core/`, `hooks/`, `timing/`, `tex/`, `probe/server` free of D3D11 types.
 2. Hide the renderer behind a minimal interface (`on_present`, `backbuffer info`), implemented by `gfx/d3d11/` now and `gfx/d3d12/` later.
 3. Keep the RE toolkit game-agnostic: `sftool` takes `--game` and an offsets DB path.

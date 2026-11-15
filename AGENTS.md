@@ -20,15 +20,19 @@ Read [README.md](README.md) and [docs/01-architecture-and-roadmap.md](docs/01-ar
 
 - **Guards & layering check:** `bash scripts/ci/check-guards.sh`
 - **Host unit tests (native Linux):**
+
   ```bash
   cmake --preset host-tests && cmake --build --preset host-tests && ctest --preset host-tests
   ```
+
 - **Build container images (first time):** `just img-build` (or `podman build -t sf-build -f docker/build.Dockerfile .`)
 - **Cross-compile Windows x64 DLL (`build/win64-release/dinput8.dll`) & probe build:**
+
   ```bash
   podman run --rm --userns=keep-id -v "$PWD:/src:Z" -v sf-ccache:/ccache -w /src sf-build \
     bash -c "cmake --preset win64-release && cmake --build --preset win64-release"
   ```
+
 - **Verify static DLL imports/exports:**
   Run `x86_64-w64-mingw32-objdump -p build/win64-release/dinput8.dll`: must export `DirectInput8Create` and must not dynamically import `libstdc++`, `libgcc_s`, `libwinpthread`, or `minhook.x64.dll`.
 - **Format C++ code:** Run `clang-format -i` (using `.clang-format`) before committing.

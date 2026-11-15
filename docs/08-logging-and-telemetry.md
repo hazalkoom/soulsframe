@@ -14,7 +14,9 @@ Never mix raw per-frame telemetry dumps into `soulsframe.log`. Keep `soulsframe.
 ## 2. Runtime log design (`soulsframe.log`)
 
 ### 2.1 Format
+
 Planned evolution from the Step 1 prototype (`[ms_since_start] [level] [module] message`):
+
 ```text
 [   12.410] [info ] [core     ] SoulsFrame v0.1.0 starting (release build)
 [   12.890] [info ] [guard    ] Offline opt-in verified
@@ -25,6 +27,7 @@ Planned evolution from the Step 1 prototype (`[ms_since_start] [level] [module] 
 ```
 
 ### 2.2 Filtering, rotation, and flushing
+
 - **Levels:** `debug`, `info`, `warn`, `error` configured via `general.log_level` in `soulsframe.toml`.
 - **Size cap / rotation:** truncate or rotate (`soulsframe.prev.log`) on startup if the previous log exceeds 5 MB so long play sessions cannot fill a disk.
 - **Flush policy:** flush immediately on startup, config warnings, hook errors, and shutdown; avoid flushing every line if `debug` level is enabled inside draw-call hooks.
@@ -37,6 +40,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 ### 3.1 Event types
 
 1. **`session_header`** (line 1 of every capture):
+
 ```json
 {
   "type": "session_header",
@@ -55,6 +59,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 ```
 
 2. **`frame`** (emitted per presented frame when capture is active):
+
 ```json
 {
   "type": "frame",
@@ -68,6 +73,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 ```
 
 3. **`gpu_pass`** (M3+, grouped by render-target set / D3D11 pass heuristics):
+
 ```json
 {
   "type": "gpu_pass",
@@ -82,6 +88,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 ```
 
 4. **`draw_site`** (M2+ `SF_PROBE` builds only, for API-anchored RE):
+
 ```json
 {
   "type": "draw_site",
@@ -96,7 +103,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 
 ## 4. Extracting info cleanly (host + probe pipeline)
 
-```
+```text
   In-game DLL (SF_PROBE)                 Host tools
   ──────────────────────                 ──────────
   Present / DeviceContext hooks          tools/py/analyze_capture.py
@@ -109,6 +116,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 ```
 
 ### Rules for low-overhead extraction
+
 1. **Never allocate or do disk I/O inside D3D11 hooks.** Push compact fixed-size records into a single-producer/single-consumer ring buffer and let a background thread format JSONL on the side.
 2. **Aggregate in-memory for `draw_site` records.** Grouping draw calls per caller RVA per 120-frame window cuts output volume by >100x while preserving the exact hotspots needed in Ghidra.
 3. **Separate Release vs Probe.** Heavy introspection (call-stack capture via `RtlCaptureStackBackTrace`, HTTP inspector server, PE memory dumping) compiles only under `SF_PROBE=ON` (`docs/01` §3).

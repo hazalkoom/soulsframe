@@ -7,7 +7,9 @@ How to find out what's actually slow, which fixes are worth the risk, and how to
 ## 1. Measurement methodology
 
 ### 1.1 Benchmark scenes
+
 Pick 5-8 repeatable spots and save a character at each (offline). Include a mix of:
+
 - GPU-heavy: fog/volumetric areas, heavy particle effects, large open vistas, boss arenas with lots of FX. Candidates reported by players as heavy include Irithyll of the Boreal Valley, Smouldering Lake, and Profaned Capital. **Verify yourself**, since reports vary by hardware.
 - CPU-heavy: dense enemy areas, large interiors.
 - Streaming-heavy: fast traversal / area transitions.
@@ -16,6 +18,7 @@ Pick 5-8 repeatable spots and save a character at each (offline). Include a mix 
 For each, run a fixed 60-second scripted path (or stand still plus fixed camera angle for the first version).
 
 ### 1.2 Metrics
+
 | Metric | Why |
 |---|---|
 | Avg frame time and FPS | Headline |
@@ -29,6 +32,7 @@ For each, run a fixed 60-second scripted path (or stand still plus fixed camera 
 Capture with the probe's JSONL + `tools/py/plot_frametimes.py`. Store captures in `bench/<date>_<scene>_<commit>.jsonl`.
 
 ### 1.3 Rules
+
 - Same hardware, driver, resolution, settings, and power profile for A/B.
 - ≥ 3 runs per config; discard run 1 (shader cache / streaming warmup).
 - Record GPU/CPU clocks if you can; thermal throttling lies.
@@ -36,6 +40,7 @@ Capture with the probe's JSONL + `tools/py/plot_frametimes.py`. Store captures i
 - Every PR touching rendering/timing includes a `sftool trace diff` result.
 
 ### 1.4 CPU-bound or GPU-bound?
+
 If GPU pass total ≈ frame time → GPU-bound: particles/post/resolution changes help.
 If GPU idles between frames and one CPU thread is pegged → CPU-bound: render-scale/FSR won't help; look at CPU hot spots (Tracy) and the game's frame loop.
 
@@ -60,6 +65,7 @@ Legend: **RE** = needs game reverse engineering. **Risk** = chance of visual/gam
 ## 3. T2: Frame pacing and presentation
 
 Hypotheses to test (each could be a no-op):
+
 - **Flip-model swap chain** (`FLIP_DISCARD`, `ALLOW_TEARING` for VRR) can lower latency and avoid compositor copies. Caveats: flip model doesn't allow MSAA back buffers, so check how DS3 renders and resolves; fullscreen-exclusive vs borderless matters; Windows "fullscreen optimizations" may already do this for you.
 - **Frame-latency waitable object** (`DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT`, `SetMaximumFrameLatency(1)`) reduces queued frames.
 - **Own frame limiter** (hybrid sleep + spin on QPC) in place of the game's if the game's limiter produces uneven pacing. Needs the limiter RE target, or cap at `Present` instead.
@@ -73,6 +79,7 @@ Kill switch: config `present.mode = "game" | "flip"`.
 **Problem:** large overlapping transparent quads (fog, smoke, spell FX) are limited by pixels shaded (overdraw), and cost scales with resolution × layers.
 
 **Approach (well-known "off-screen / low-resolution particles"):**
+
 1. Detect the particle pass: render target set unchanged, **blend enabled** (alpha/additive), **depth test on, depth write off**, draw count high. Verify in RenderDoc, then encode the heuristic in `games/ds3/render.cpp`.
 2. At pass start: create a half- (or quarter-) res RT (RGBA16F) + a **downsampled depth** (min or max of 2×2) to keep occlusion correct.
 3. Redirect the pass's draws to the low-res RT (adjust viewport/scissor; clear to transparent black).
@@ -115,6 +122,7 @@ Two parts, and the second is the hard one.
 **(a) Upscale pass (easy):** in the `Present` hook, take the scaled color buffer, run **EASU** (upscale) + **RCAS** (sharpen) as compute passes into the real back buffer. FSR 1 shader code is MIT-licensed HLSL (`ffx_a.h`, `ffx_fsr1.h` in AMD's FidelityFX repos). Compile at runtime with `D3DCompile`.
 
 **(b) Reduce internal resolution (hard):**
+
 1. Intercept `CreateTexture2D` for textures whose dimensions equal the screen size and scale them (render targets, depth, G-buffer-like targets). Keep UI targets at native size. Identify UI by when it draws (last passes) via the tracer.
 2. Scale viewports/scissors in `RSSetViewports/RSSetScissorRects`.
 3. **Fix shader constants** that hold screen size / inverse size / pixel offsets (cbuffers). This requires RE: find them via the tracer's cbuffer dump and diffing between resolutions.
@@ -143,6 +151,7 @@ AMD's FSR 2 had a D3D11 backend in some releases, and later FidelityFX SDK versi
 | D. Global dt override (naive) | Change the one delta | Quick experiment | Known to break stuff: use only as an **experiment** |
 
 **Plan:**
+
 1. M4 gives the dt sources and limiter.
 2. **Experiment E1** (naive dt override at 90/120) with a checklist: weapon durability loss per swing, fall damage thresholds, jump distance, roll i-frames, ladder speed, animation-triggered effects, spell cast timings, regen rates, bonfire/menus. Record results in `re/notes/fps_unlock_experiments.md`.
 3. Based on results pick A or B (or ship without T9).
@@ -152,6 +161,7 @@ Kill switch required; default off.
 ## 11. T10: CPU hot spots
 
 Only if M3 says CPU-bound.
+
 - Tracy zones around the hooks you own; sampling profile via Tracy or `perf` (under Proton, symbolication of game code is the hard part, so use your Ghidra names).
 - Candidates (hypotheses): per-frame allocations, shader/resource creation on the render thread, thread contention around the render submission, driver-side overhead from many small draws/state changes (consider redundant state-change filtering in context hooks).
 - Redundant-state filtering (skip `PSSetShaderResources`/`OMSetBlendState` calls that don't change anything) is low-risk and safe to try early.

@@ -8,15 +8,16 @@ Goal: every push proves the DLL still cross-compiles, pure code still passes tes
 
 | Workflow | Trigger | Jobs | Time budget |
 |---|---|---|---|
-| `ci.yml` | push, PR | `lint` → `host-tests` (+ASan/UBSan) → `win64` build → `wine-smoke` | < 10 min |
-| `nightly.yml` | cron (03:00 UTC), manual | long fuzz, coverage, microbenchmarks, shader golden images, dependency drift check | < 60 min |
-| `release.yml` | tag `v*.*.*` | rebuild from tag, smoke test, checksums, attest, GitHub Release | < 20 min |
-| `codeql.yml` | push to main, weekly | CodeQL C/C++ analysis | < 30 min |
-| `docs.yml` | PR touching `*.md` | markdown lint, link check | < 2 min |
+| `ci.yml` | push (`main`, `develop`, `feat/**`, `fix/**`, `test/**`, `docs/**`, `ci/**`), PR | `guards` (+`gitleaks`) → `static-analysis` (`clang-format`, `clang-tidy`, `cppcheck`), `host-tests` (`g++`/`clang++`/`ASan` with `SF_WERROR`), `win64` (`release`+`probe`), `docker-verify` → `wine-smoke` (3 scenarios) | < 12 min |
+| `codeql.yml` | push (`main`, `develop`), PR, weekly cron | CodeQL C/C++ (`security-extended`) | < 20 min |
+| `auto-merge.yml` | `pull_request_target` | Approves Dependabot & repo branch PRs and enables `--auto --squash` once all required checks succeed | < 1 min |
+| `release.yml` | tag `v*.*.*` | rebuild from tag (`SF_WERROR=ON`), smoke test, `SHA256SUMS`, provenance attest, GitHub Release | < 20 min |
+| `nightly.yml` | cron (03:00 UTC), manual | long fuzz, coverage, microbenchmarks, shader golden images, dependency drift check (planned) | < 60 min |
 
 ## 2. `ci.yml` job design
 
 ### lint
+
 - `clang-format --dry-run --Werror` on changed files.
 - `cppcheck` with `--enable=warning,performance,portability --error-exitcode=1`.
 - `clang-tidy` only on host-compilable code (via `host-tests` compile database), not on Win32 glue.
@@ -24,11 +25,13 @@ Goal: every push proves the DLL still cross-compiles, pure code still passes tes
 - Guard script: fails if pure modules include `<windows.h>`.
 
 ### host-tests
+
 - Matrix: `{gcc, clang} × {Debug, ASan+UBSan}` on `ubuntu-latest`.
 - `cmake --preset host-tests && ctest --preset host-tests`.
 - Upload `Testing/` logs on failure.
 
 ### win64
+
 - Runs in the same container image as local dev (`docker/build.Dockerfile`), so CI and laptop match. Build the image with `docker/build-push-action` and cache layers in the GitHub cache (`cache-from: type=gha`).
 - ccache state in `actions/cache` keyed by compiler version + hash of `CMakeLists.txt` and `cmake/deps.cmake`.
 - Builds both `win64-release` and `win64-probe`.
@@ -36,6 +39,7 @@ Goal: every push proves the DLL still cross-compiles, pure code still passes tes
 - Uploads `dinput8.dll` (release and probe) plus `.pdb`-equivalent debug info (`.debug` split via `objcopy --only-keep-debug`) as artifacts.
 
 ### wine-smoke
+
 - Needs `win64`. Runs `docker/wine-test.Dockerfile` with `scripts/smoke-test.sh`.
 - Runs all testbed modes from `docs/05` §5, asserts on `smoke-result.json`.
 - Uses `xvfb-run` and a hard timeout. Failure uploads `soulsframe.log` and the Wine log (`WINEDEBUG=+loaddll,err`).

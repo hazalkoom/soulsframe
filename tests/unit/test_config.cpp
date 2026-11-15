@@ -106,7 +106,8 @@ TEST_CASE("config handles adversarial types, negative bounds, null bytes, and la
   CHECK_FALSE(huge.warnings.empty());
 
   // Embedded NUL bytes must fail cleanly without throwing out of parse_config_toml.
-  const std::string_view nul_payload("[general]\noffline_acknowledged = true\0bad", 43);
+  using namespace std::string_view_literals;
+  const std::string_view nul_payload = "[general]\noffline_acknowledged = true\0bad"sv;
   const auto nul_res = sf::parse_config_toml(nul_payload);
   CHECK_FALSE(nul_res.parsed_ok);
   CHECK_FALSE(nul_res.config.general.offline_acknowledged);

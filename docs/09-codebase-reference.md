@@ -40,7 +40,7 @@ flowchart TD
 | [src/core/config.h](../src/core/config.h) / [.cpp](../src/core/config.cpp) | `sf::Config`, `sf::parse_config_toml()`, `sf::load_config_file()` | TOML parsing with bounds clamping, warning collection, and safe fallback on syntax errors. |
 | [src/core/offline_guard.h](../src/core/offline_guard.h) / [.cpp](../src/core/offline_guard.cpp) | `sf::OfflineCheckInput`, `sf::evaluate_offline_guard()` | Enforces explicit `offline_acknowledged = true` opt-in and rejects online flags/session state. |
 | [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features; uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
-| [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes modules independently, honors config kill switches and `requires_engine_hooks()`. |
+| [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
 | [src/core/sha256.h](../src/core/sha256.h) / [.cpp](../src/core/sha256.cpp) | `sf::sha256_bytes()`, `sf::sha256_hex()` | Zero-dependency SHA-256 implementation for executable version pinning. |
 | [src/timing/frame_stats.h](../src/timing/frame_stats.h) / [.cpp](../src/timing/frame_stats.cpp) | `sf::timing::IClock`, `sf::timing::FrameStats`, `sf::timing::FrameMetrics` | Rolling ring-buffer frame-time stats (avg, FPS, 1%/0.1% lows, >2x median spikes). |
 | [src/tex/content_hash.h](../src/tex/content_hash.h) / [.cpp](../src/tex/content_hash.cpp) | `sf::tex::hash_bytes()`, `sf::tex::hash_hex()` | Fast 64-bit `XXH64` content hashing for future texture and shader registries. |
@@ -61,7 +61,8 @@ flowchart TD
 
 | File | Layer | Purpose |
 |---|---|---|
-| [tests/unit/](../tests/unit/) | L1 (Linux native) | 8 `doctest` suites testing all pure C++ modules without Windows or a GPU. |
-| [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) | L4/L5 (Wine/Windows) | Minimal D3D11 window that loads `dinput8.dll`, renders frames, and optionally calls `ResizeBuffers`. |
-| [scripts/smoke-test.sh](../scripts/smoke-test.sh) | L4 | Tests both blocked offline-guard behavior and hooked `Present` + `ResizeBuffers` under headless Wine. |
-| [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh) | L0 | Rejects tracked game binaries/zips and enforces zero `<windows.h>`/`<d3d11.h>` includes in pure modules. |
+| [tests/unit/](../tests/unit/) | L1 (Linux native) | 8 `doctest` suites (23 test cases, 605 assertions) stress-testing all pure C++ modules with `SF_WERROR=ON`. |
+| [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) | L4/L5 (Wine/Windows) | Minimal D3D11 window that loads `dinput8.dll`, renders frames, and optionally calls `ResizeBuffers` or `--msaa 4`. |
+| [scripts/smoke-test.sh](../scripts/smoke-test.sh) | L4 | 3-scenario Wine smoke suite testing blocked offline-guard behavior, 300-frame `ResizeBuffers`, and 150-frame MSAA 4x swapchains. |
+| [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh) | L0 | Rejects tracked game binaries/zips, `<windows.h>`/`<d3d11.h>` leaks in pure modules, RVA leaks outside `ds3/`, unpinned tags, missing licenses, weak offline defaults, and missing `///` header docstrings. |
+| [.github/workflows/](../.github/workflows/) | CI/CD | Automated `ci.yml` (`guards`, `gitleaks`, strict `docs`, `static-analysis`, `host-tests`, `win64`, `wine-smoke`, `docker-verify`), `codeql.yml`, `auto-merge.yml`, and `release.yml`. |
