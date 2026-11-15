@@ -131,3 +131,44 @@ TEST_CASE("config load_config_file handles missing path safely") {
   CHECK_FALSE(missing.config.general.offline_acknowledged);
   CHECK_FALSE(missing.warnings.empty());
 }
+
+TEST_CASE("config validates [probe] settings and rejects unsafe output paths") {
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    probe_tracer = true
+
+    [probe]
+    capture_frames = 240
+    output_file = "ds3_trace.jsonl"
+    trace_resources = false
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.probe_tracer);
+  CHECK(valid.config.probe.capture_frames == 240);
+  CHECK(valid.config.probe.output_file == "ds3_trace.jsonl");
+  CHECK_FALSE(valid.config.probe.trace_resources);
+
+  const auto bad = sf::parse_config_toml(R"(
+    [probe]
+    capture_frames = 0
+    output_file = "../../etc/passwd"
+    trace_resources = "yes"
+    extra_key = 1
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.probe.capture_frames == 1);
+  CHECK(bad.config.probe.output_file == "soulsframe_capture.jsonl");
+  CHECK(bad.config.probe.trace_resources);
+  CHECK(bad.warnings.size() == 4);
+
+  const auto wrong_file_type = sf::parse_config_toml(R"(
+    [probe]
+    capture_frames = 999999
+    output_file = 123
+  )");
+  CHECK(wrong_file_type.parsed_ok);
+  CHECK(wrong_file_type.config.probe.capture_frames == 36000);
+  CHECK(wrong_file_type.config.probe.output_file == "soulsframe_capture.jsonl");
+  CHECK(wrong_file_type.warnings.size() == 2);
+}

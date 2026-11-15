@@ -26,6 +26,33 @@ void warn_unknown_keys(const toml::table& tbl, std::string_view prefix,
   }
 }
 
+void read_bool_key(const toml::table& tbl, std::string_view key, std::string_view full_name,
+                   bool& target, std::vector<std::string>& warnings) {
+  if (auto v = tbl[key].value<bool>()) {
+    target = *v;
+  } else if (tbl.contains(key)) {
+    warnings.emplace_back(std::string(full_name) + " must be boolean; using default");
+  }
+}
+
+void read_clamped_u32(const toml::table& tbl, std::string_view key, std::string_view full_name,
+                      uint32_t min_val, uint32_t max_val, uint32_t& target,
+                      std::vector<std::string>& warnings) {
+  if (auto v = tbl[key].value<int64_t>()) {
+    if (*v < static_cast<int64_t>(min_val)) {
+      target = min_val;
+      warnings.emplace_back(std::string(full_name) + " clamped to " + std::to_string(min_val));
+    } else if (*v > static_cast<int64_t>(max_val)) {
+      target = max_val;
+      warnings.emplace_back(std::string(full_name) + " clamped to " + std::to_string(max_val));
+    } else {
+      target = static_cast<uint32_t>(*v);
+    }
+  } else if (tbl.contains(key)) {
+    warnings.emplace_back(std::string(full_name) + " must be integer; using default");
+  }
+}
+
 } // namespace
 
 ConfigParseResult parse_config_toml(std::string_view toml_text) {
@@ -41,7 +68,7 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     return out;
   }
 
-  constexpr std::array<std::string_view, 3> kRootKeys = {"general", "present", "modules"};
+  constexpr std::array<std::string_view, 4> kRootKeys = {"general", "present", "modules", "probe"};
   warn_unknown_keys(root, "", kRootKeys, out.warnings);
 
   if (auto* gen = root["general"].as_table()) {
@@ -49,17 +76,10 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                                                           "log_level"};
     warn_unknown_keys(*gen, "general.", kGenKeys, out.warnings);
 
-    if (auto v = (*gen)["offline_acknowledged"].value<bool>()) {
-      out.config.general.offline_acknowledged = *v;
-    } else if (gen->contains("offline_acknowledged")) {
-      out.warnings.emplace_back("general.offline_acknowledged must be boolean; using default");
-    }
-
-    if (auto v = (*gen)["mod_enabled"].value<bool>()) {
-      out.config.general.mod_enabled = *v;
-    } else if (gen->contains("mod_enabled")) {
-      out.warnings.emplace_back("general.mod_enabled must be boolean; using default");
-    }
+    read_bool_key(*gen, "offline_acknowledged", "general.offline_acknowledged",
+                  out.config.general.offline_acknowledged, out.warnings);
+    read_bool_key(*gen, "mod_enabled", "general.mod_enabled", out.config.general.mod_enabled,
+                  out.warnings);
 
     if (auto v = (*gen)["log_level"].value<std::string>()) {
       if (*v == "debug" || *v == "info" || *v == "warn" || *v == "error") {
@@ -86,35 +106,41 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
       out.warnings.emplace_back("present.mode must be string; using default");
     }
 
-    if (auto v = (*pres)["max_fps"].value<int64_t>()) {
-      if (*v < 0) {
-        out.config.present.max_fps = 0;
-        out.warnings.emplace_back("present.max_fps clamped to 0");
-      } else if (*v > 360) {
-        out.config.present.max_fps = 360;
-        out.warnings.emplace_back("present.max_fps clamped to 360");
-      } else {
-        out.config.present.max_fps = static_cast<uint32_t>(*v);
-      }
-    } else if (pres->contains("max_fps")) {
-      out.warnings.emplace_back("present.max_fps must be integer; using default");
-    }
+    read_clamped_u32(*pres, "max_fps", "present.max_fps", 0U, 360U, out.config.present.max_fps,
+                     out.warnings);
   }
 
   if (auto* mods = root["modules"].as_table()) {
-    constexpr std::array<std::string_view, 2> kModKeys = {"frame_telemetry", "presentation"};
+    constexpr std::array<std::string_view, 3> kModKeys = {"frame_telemetry", "presentation",
+                                                          "probe_tracer"};
     warn_unknown_keys(*mods, "modules.", kModKeys, out.warnings);
 
-    if (auto v = (*mods)["frame_telemetry"].value<bool>()) {
-      out.config.modules.frame_telemetry = *v;
-    } else if (mods->contains("frame_telemetry")) {
-      out.warnings.emplace_back("modules.frame_telemetry must be boolean; using default");
-    }
+    read_bool_key(*mods, "frame_telemetry", "modules.frame_telemetry",
+                  out.config.modules.frame_telemetry, out.warnings);
+    read_bool_key(*mods, "presentation", "modules.presentation", out.config.modules.presentation,
+                  out.warnings);
+    read_bool_key(*mods, "probe_tracer", "modules.probe_tracer", out.config.modules.probe_tracer,
+                  out.warnings);
+  }
 
-    if (auto v = (*mods)["presentation"].value<bool>()) {
-      out.config.modules.presentation = *v;
-    } else if (mods->contains("presentation")) {
-      out.warnings.emplace_back("modules.presentation must be boolean; using default");
+  if (auto* prb = root["probe"].as_table()) {
+    constexpr std::array<std::string_view, 3> kProbeKeys = {"capture_frames", "output_file",
+                                                            "trace_resources"};
+    warn_unknown_keys(*prb, "probe.", kProbeKeys, out.warnings);
+
+    read_clamped_u32(*prb, "capture_frames", "probe.capture_frames", 1U, 36000U,
+                     out.config.probe.capture_frames, out.warnings);
+    read_bool_key(*prb, "trace_resources", "probe.trace_resources",
+                  out.config.probe.trace_resources, out.warnings);
+
+    if (auto v = (*prb)["output_file"].value<std::string>()) {
+      if (v->empty() || v->find("..") != std::string::npos) {
+        out.warnings.emplace_back("probe.output_file invalid or unsafe; using default");
+      } else {
+        out.config.probe.output_file = *v;
+      }
+    } else if (prb->contains("output_file")) {
+      out.warnings.emplace_back("probe.output_file must be string; using default");
     }
   }
 
