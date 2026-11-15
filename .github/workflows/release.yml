@@ -70,12 +70,12 @@ jobs:
 
           (cd artifacts && sha256sum *.zip > SHA256SUMS.txt)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-packages
           path: artifacts/*
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-testbed
           path: build/win64-release/d3d11_testbed.exe
