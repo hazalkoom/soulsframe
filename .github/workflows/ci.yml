@@ -52,6 +52,7 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp
       - name: Run cppcheck strict static analysis
@@ -75,6 +76,7 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp
 

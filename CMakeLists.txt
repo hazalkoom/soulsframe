@@ -34,14 +34,24 @@ target_include_directories(soulsframe_core PUBLIC src)
 target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})
 target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::xxhash)
 
+add_library(soulsframe_probe_core STATIC
+  src/probe/trace_types.cpp
+)
+target_include_directories(soulsframe_probe_core PUBLIC src)
+target_compile_options(soulsframe_probe_core PRIVATE ${SF_WARN_FLAGS})
+
 if(SF_HOST_ONLY AND SF_SANITIZE)
   target_compile_options(soulsframe_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(soulsframe_core PUBLIC -fsanitize=address,undefined)
+  target_compile_options(soulsframe_probe_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+  target_link_options(soulsframe_probe_core PUBLIC -fsanitize=address,undefined)
 endif()
 
 if(SF_HOST_ONLY AND SF_COVERAGE)
   target_compile_options(soulsframe_core PUBLIC --coverage -O0 -g)
   target_link_options(soulsframe_core PUBLIC --coverage)
+  target_compile_options(soulsframe_probe_core PUBLIC --coverage -O0 -g)
+  target_link_options(soulsframe_probe_core PUBLIC --coverage)
 endif()
 
 if(NOT SF_HOST_ONLY)
@@ -74,6 +84,7 @@ if(NOT SF_HOST_ONLY)
   )
   if(SF_PROBE)
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
+    target_link_libraries(soulsframe PRIVATE soulsframe_probe_core)
   endif()
 
   if(SF_BUILD_TESTBED)
