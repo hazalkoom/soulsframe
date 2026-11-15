@@ -24,6 +24,9 @@ test-host:
 test-asan:
     cmake --preset host-asan && cmake --build --preset host-asan && ctest --preset host-asan
 
+test-cov:
+    bash scripts/ci/run-coverage.sh
+
 smoke:
     {{run}} sf-wine-test bash scripts/smoke-test.sh
 

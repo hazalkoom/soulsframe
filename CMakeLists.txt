@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(SF_PROBE "Build RE/telemetry features" OFF)
 option(SF_HOST_ONLY "Build only the native pure-C++ parts (tests/tools)" OFF)
 option(SF_SANITIZE "Enable Address and UndefinedBehavior sanitizers on host builds" OFF)
+option(SF_COVERAGE "Enable gcov/lcov code coverage instrumentation on host builds" OFF)
 option(SF_BUILD_TESTBED "Build the D3D11 smoke-testbed executable" OFF)
 option(SF_WERROR "Treat compiler warnings as errors on SoulsFrame targets" OFF)
 
@@ -36,6 +37,11 @@ target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::
 if(SF_HOST_ONLY AND SF_SANITIZE)
   target_compile_options(soulsframe_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(soulsframe_core PUBLIC -fsanitize=address,undefined)
+endif()
+
+if(SF_HOST_ONLY AND SF_COVERAGE)
+  target_compile_options(soulsframe_core PUBLIC --coverage -O0 -g)
+  target_link_options(soulsframe_core PUBLIC --coverage)
 endif()
 
 if(NOT SF_HOST_ONLY)
