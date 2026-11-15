@@ -3,6 +3,9 @@ name: Auto-Merge Verified PRs
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -12,6 +15,7 @@ jobs:
   enable-auto-merge:
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'pull_request_target' &&
       !github.event.pull_request.draft &&
       (github.event.pull_request.user.login == 'dependabot[bot]' ||
        github.event.pull_request.head.repo.full_name == github.repository)
@@ -28,3 +32,22 @@ jobs:
           if ! gh pr merge --auto --squash "$PR_URL"; then
             echo "Auto-merge requires active required checks or clean branch state; waiting for CI completion."
           fi
+
+  merge-after-ci:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Approve and squash-merge verified open Dependabot PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          pr_nums=$(gh pr list --repo "$REPO" --state open --json number,isDraft,author,mergeStateStatus \
+            --jq '.[] | select(.isDraft == false and .author.login == "app/dependabot" and .mergeStateStatus == "CLEAN") | .number')
+          for pr in $pr_nums; do
+            echo "Auto-merging verified Dependabot PR #${pr}"
+            gh pr review --repo "$REPO" "$pr" --approve || true
+            gh pr merge --repo "$REPO" "$pr" --squash --auto || gh pr merge --repo "$REPO" "$pr" --squash || true
+          done
