@@ -1,0 +1,64 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "win64-release",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "SF_PROBE": "OFF",
+        "SF_BUILD_TESTBED": "ON"
+      }
+    },
+    {
+      "name": "win64-probe",
+      "inherits": "win64-release",
+      "cacheVariables": {
+        "SF_PROBE": "ON"
+      }
+    },
+    {
+      "name": "host-tests",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SF_HOST_ONLY": "ON"
+      }
+    },
+    {
+      "name": "host-asan",
+      "inherits": "host-tests",
+      "cacheVariables": {
+        "SF_SANITIZE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "win64-release", "configurePreset": "win64-release" },
+    { "name": "win64-probe",   "configurePreset": "win64-probe" },
+    { "name": "host-tests",    "configurePreset": "host-tests" },
+    { "name": "host-asan",     "configurePreset": "host-asan" }
+  ],
+  "testPresets": [
+    {
+      "name": "host-tests",
+      "configurePreset": "host-tests",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "host-asan",
+      "configurePreset": "host-asan",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}
