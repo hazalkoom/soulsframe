@@ -1,4 +1,4 @@
-# 09. Codebase reference (Step 1: M0/M1 foundation)
+# 09. Codebase reference (M0/M1 foundation + M2 probe v1)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -17,21 +17,23 @@ flowchart TD
   G -- allowed --> H["compute_host_exe_sha256() + resolve_profile()"]
   H --> I["ModuleRegistry::init_all(profile, cfg)"]
   I --> J["FrameTelemetryModule::init() -> install_swapchain_hooks()"]
+  I --> P["ProbeModule::init() [SF_PROBE=1] -> install_context_hooks()"]
   J --> K["hooked_present() ticks FrameStats & calls ModuleRegistry::on_present()"]
+  P --> L["hooked Draw*/Dispatch/Clear* -> TraceRecorder -> async JSONL writer thread"]
 ```
 
 ## 2. Build & tooling files
 
 | File | Purpose |
 |---|---|
-| [CMakeLists.txt](../CMakeLists.txt) | Root build graph: builds pure static library `soulsframe_core`, plus either Windows `dinput8.dll` + `d3d11_testbed.exe` or native Linux `soulsframe_unit_tests`. |
-| [CMakePresets.json](../CMakePresets.json) | Named configurations: `win64-release`, `win64-probe`, `host-tests`, `host-asan`. |
+| [CMakeLists.txt](../CMakeLists.txt) | Root build graph: builds pure static libraries `soulsframe_core` and `soulsframe_probe_core`, plus either Windows `dinput8.dll` + `d3d11_testbed.exe` or native Linux `soulsframe_unit_tests`. |
+| [CMakePresets.json](../CMakePresets.json) | Named configurations: `win64-release`, `win64-probe`, `host-tests`, `host-asan`, `host-cov`. |
 | [cmake/deps.cmake](../cmake/deps.cmake) | Pinned `FetchContent` dependencies (`tomlplusplus` v3.4.0, `xxHash` v0.8.4, `MinHook` v1.3.4, `doctest` v2.5.3) with `BUILD_SHARED_LIBS=OFF`. |
 | [cmake/toolchains/mingw-w64-x86_64.cmake](../cmake/toolchains/mingw-w64-x86_64.cmake) | Cross-compile toolchain supporting both Fedora and Debian/Ubuntu MinGW sysroot layouts. |
 | [docker/build.Dockerfile](../docker/build.Dockerfile) | Reproducible Fedora 43 MinGW-w64 + CMake + Ninja + ccache + clang-tools container (`sf-build`). |
 | [docker/wine-test.Dockerfile](../docker/wine-test.Dockerfile) | Headless Fedora 43 + Wine + Xvfb + Mesa container (`sf-wine-test`). |
-| [justfile](../justfile) | Task runner shortcuts (`img-build`, `build`, `probe`, `test-host`, `smoke`, `deploy`). |
-| [config/soulsframe.toml.example](../config/soulsframe.toml.example) | Default documented configuration template shipped to users. |
+| [justfile](../justfile) | Task runner shortcuts (`img-build`, `build`, `probe`, `test-host`, `test-cov`, `smoke`, `deploy`). |
+| [config/soulsframe.toml.example](../config/soulsframe.toml.example) | Default documented configuration template shipped to users (including `[probe]` settings). |
 
 ## 3. Pure C++ modules (Linux-testable, no Win32/D3D11)
 
@@ -46,6 +48,8 @@ flowchart TD
 | [src/tex/content_hash.h](../src/tex/content_hash.h) / [.cpp](../src/tex/content_hash.cpp) | `sf::tex::hash_bytes()`, `sf::tex::hash_hex()` | Fast 64-bit `XXH64` content hashing for future texture and shader registries. |
 | [src/hooks/sigscan.h](../src/hooks/sigscan.h) / [.cpp](../src/hooks/sigscan.cpp) | `sf::hooks::parse_pattern()`, `sf::hooks::sigscan()` | IDA-style byte-signature parser/scanner that refuses ambiguous multiple matches. |
 | [src/games/ds3/profile.h](../src/games/ds3/profile.h) / [.cpp](../src/games/ds3/profile.cpp) | `sf::GameProfile`, `sf::games::ds3::resolve_profile()` | Build-hash lookup; unknown hashes disable engine hooks while keeping telemetry active. |
+| [src/probe/trace_types.h](../src/probe/trace_types.h) / [.cpp](../src/probe/trace_types.cpp) | `sf::probe::TraceRecorder`, `DrawCallState`, `classify_pass()`, `PassSummary`, `CallSiteStats` | Pure-C++ M2 draw-call aggregator, pass-boundary detector, resource deduplicator, and heuristic pass classifier (`particles_alpha`, `gbuffer`, `shadow`, etc.). |
+| [src/probe/jsonl_writer.h](../src/probe/jsonl_writer.h) / [.cpp](../src/probe/jsonl_writer.cpp) | `sf::probe::format_session_header()`, `serialize_frame_snapshot()`, `json_escape()` | Pure-C++ JSONL event serializer emitting `session_header`, `resource`, `frame`, `gpu_pass`, and `draw_site` records. |
 
 ## 4. Windows DLL & D3D11 hook layer
 
@@ -55,17 +59,21 @@ flowchart TD
 | [src/core/log.h](../src/core/log.h) / [.cpp](../src/core/log.cpp) | `sf::log::init()`, `SF_LOG()`, `sf::log::module_dir()` | Thread-safe logger creating `soulsframe.log` alongside `dinput8.dll`. |
 | [src/core/win_helpers.h](../src/core/win_helpers.h) / [.cpp](../src/core/win_helpers.cpp) | `sf::WinClock`, `compute_host_exe_sha256()`, `detect_known_overlays()` | QPC monotonic clock, executable hashing, CLI tokenization, conflicting overlay detection. |
 | [src/gfx/d3d11/swapchain_hook.h](../src/gfx/d3d11/swapchain_hook.h) / [.cpp](../src/gfx/d3d11/swapchain_hook.cpp) | `install_swapchain_hooks()`, `hooked_present()`, `hooked_resize_buffers()` | Creates a dummy D3D11 device to resolve `IDXGISwapChain` vtable slots 8 & 13 and hooks them with MinHook. |
-| [src/core/dllmain.cpp](../src/core/dllmain.cpp) | `DllMain`, `init_thread`, `FrameTelemetryModule` | Spawns background initialization outside loader lock and orchestrates clean shutdown. |
+| [src/gfx/d3d11/context_hook.h](../src/gfx/d3d11/context_hook.h) / [.cpp](../src/gfx/d3d11/context_hook.cpp) | `install_context_hooks()`, `remove_context_hooks()` | (`SF_PROBE=1` only) Hooks 7 `ID3D11DeviceContext` vtable slots (`DrawIndexed`, `Draw`, `DrawIndexedInstanced`, `DrawInstanced`, `Dispatch`, `ClearRenderTargetView`, `ClearDepthStencilView`), capturing RTV/blend/depth/shader/RVA state cleanly with COM reference counting and re-entrancy guards. |
+| [src/probe/probe_module.h](../src/probe/probe_module.h) / [.cpp](../src/probe/probe_module.cpp) | `sf::probe::ProbeModule` | (`SF_PROBE=1` only) `sf::Module` implementation bridging `context_hook` -> `TraceRecorder` -> background JSONL writer thread with loader-lock-safe shutdown. |
+| [src/core/dllmain.cpp](../src/core/dllmain.cpp) | `DllMain`, `init_thread`, `FrameTelemetryModule` | Spawns background initialization outside loader lock, registers active modules (`FrameTelemetryModule`, plus `ProbeModule` in `SF_PROBE`), and orchestrates clean shutdown. |
 
 ## 5. Tests and verification scripts
 
 | File | Layer | Purpose |
 |---|---|---|
-| [tests/unit/](../tests/unit/) | L1 (Linux native) | 8 `doctest` suites (23 test cases, 605 assertions) stress-testing all pure C++ modules with `SF_WERROR=ON`. |
-| [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) | L4/L5 (Wine/Windows) | Minimal D3D11 window that loads `dinput8.dll`, renders frames, and optionally calls `ResizeBuffers` or `--msaa 4`. |
-| [scripts/smoke-test.sh](../scripts/smoke-test.sh) | L4 | 3-scenario Wine smoke suite testing blocked offline-guard behavior, 300-frame `ResizeBuffers`, and 150-frame MSAA 4x swapchains. |
+| [tests/unit/](../tests/unit/) | L1 (Linux native) | 10 `doctest` suites (29 test cases, 673 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) with `SF_WERROR=ON`. |
+| [tests/fuzz/](../tests/fuzz/) | L2 (Linux libFuzzer + ASan/UBSan) | 3 libFuzzer targets (`fuzz_config`, `fuzz_sigscan`, `fuzz_probe_jsonl`) and seed corpora exercised on every CI run. |
+| [scripts/ci/run-coverage.sh](../scripts/ci/run-coverage.sh) | L1 (Linux `gcovr`) | Configures `host-cov`, runs `ctest`, generates HTML/XML/JSON reports, and enforces `SF_MIN_LINE_COVERAGE=90`. |
+| [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) | L4/L5 (Wine/Windows) | Minimal D3D11 window that loads `dinput8.dll`, renders frames, and supports `--resize`, `--msaa 4`, and `--particles` (HLSL VS+PS + instanced alpha-blended draws). |
+| [scripts/smoke-test.sh](../scripts/smoke-test.sh) | L4 | 4-scenario Wine smoke suite testing blocked offline-guard behavior, 300-frame `ResizeBuffers`, 150-frame MSAA 4x swapchains, and `SF_PROBE` 20-frame JSONL capture with `--particles`. |
 | [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh) | L0 | Rejects tracked game binaries/zips, `<windows.h>`/`<d3d11.h>` leaks in pure modules, RVA leaks outside `ds3/`, unpinned or non-HTTPS dependencies, missing licenses, weak offline defaults, missing PE mitigations, and missing `///` header docstrings. |
-| [tools/py/analyze_capture.py](../tools/py/analyze_capture.py) | Host | Stdlib-capable telemetry and `smoke-result.json` analyzer (`--self-test` verified in CI) paired with exact-pinned [tools/py/requirements.txt](../tools/py/requirements.txt). |
+| [tools/py/analyze_capture.py](../tools/py/analyze_capture.py) | Host | Stdlib-capable telemetry, pass-breakdown, draw-site hotspot, and `smoke-result.json` analyzer (`--self-test` verified in CI) paired with exact-pinned [tools/py/requirements.txt](../tools/py/requirements.txt). |
 | [SECURITY.md](../SECURITY.md) | Policy | Repository security policy, offline-only threat model, PE exploit mitigations (`HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, `NX_COMPAT`), and Security Advisories reporting. |
 | [.github/dependabot.yml](../.github/dependabot.yml) | Deps | Multi-ecosystem weekly Dependabot scanning across `github-actions`, `docker` (`/docker`), and `pip` (`/tools/py`). |
-| [.github/workflows/](../.github/workflows/) | CI/CD | Automated `ci.yml` (`guards`, `gitleaks`, strict `docs`, `static-analysis`, `host-tests`, `win64` + PE mitigation check, `wine-smoke`, `docker-verify`), `security.yml`, `codeql.yml`, `auto-merge.yml`, and `release.yml`. |
+| [.github/workflows/](../.github/workflows/) | CI/CD | Automated `ci.yml` (`guards`, `gitleaks`, strict `docs`, `static-analysis`, `host-tests`, `coverage`, `fuzz-smoke`, `win64` + PE mitigation check, `wine-smoke`, `docker-verify`), `security.yml`, `codeql.yml`, `auto-merge.yml`, and `release.yml`. |
