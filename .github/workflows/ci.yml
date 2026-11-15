@@ -120,11 +120,18 @@ jobs:
         run: |
           cmake --preset win64-probe -DSF_WERROR=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
           cmake --build --preset win64-probe
-      - name: Audit DLL exports and imports
+      - name: Audit DLL exports, imports, and PE exploit mitigations
         run: |
           for preset in win64-release win64-probe; do
             x86_64-w64-mingw32-objdump -p "build/${preset}/dinput8.dll" > "objdump-${preset}.txt"
             grep -q "DirectInput8Create" "objdump-${preset}.txt"
+            for flag in HIGH_ENTROPY_VA DYNAMIC_BASE NX_COMPAT; do
+              if ! grep -q "$flag" "objdump-${preset}.txt"; then
+                echo "Missing PE security mitigation $flag in ${preset}!"
+                cat "objdump-${preset}.txt"
+                exit 1
+              fi
+            done
             if grep -Eqi "libstdc\+\+|libgcc_s|libwinpthread|minhook" "objdump-${preset}.txt"; then
               echo "Unexpected runtime DLL dependency in static ${preset} build!"
               cat "objdump-${preset}.txt"

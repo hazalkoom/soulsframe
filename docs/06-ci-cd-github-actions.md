@@ -8,7 +8,8 @@ Goal: every push proves the DLL still cross-compiles, pure code still passes tes
 
 | Workflow | Trigger | Jobs | Time budget |
 |---|---|---|---|
-| `ci.yml` | push (`main`, `develop`, `feat/**`, `fix/**`, `test/**`, `docs/**`, `ci/**`), PR | `guards` (+`gitleaks`) → `static-analysis` (`clang-format`, `clang-tidy`, `cppcheck`), `host-tests` (`g++`/`clang++`/`ASan` with `SF_WERROR`), `win64` (`release`+`probe`), `docker-verify` → `wine-smoke` (3 scenarios) | < 12 min |
+| `ci.yml` | push (`main`, `develop`, `feat/**`, `fix/**`, `test/**`, `docs/**`, `ci/**`), PR | `guards` (+`gitleaks`) → `static-analysis` (`clang-format`, `clang-tidy`, `cppcheck`), `host-tests` (`g++`/`clang++`/`ASan` with `SF_WERROR`), `win64` (`release`+`probe` + PE hardening check), `docker-verify` → `wine-smoke` (3 scenarios) | < 12 min |
+| `security.yml` | push (`main`, `develop`, feature branches), PR, weekly cron | `dependency-review` (PR moderate+ CVE/license block), `supply-chain-audit` (guards, HTTPS pins, workflow `permissions:`, `analyze_capture.py --self-test`, `gitleaks`) | < 5 min |
 | `codeql.yml` | push (`main`, `develop`), PR, weekly cron | CodeQL C/C++ (`security-extended`) | < 20 min |
 | `auto-merge.yml` | `pull_request_target` | Approves Dependabot & repo branch PRs and enables `--auto --squash` once all required checks succeed | < 1 min |
 | `release.yml` | tag `v*.*.*` | rebuild from tag (`SF_WERROR=ON`), smoke test, `SHA256SUMS`, provenance attest, GitHub Release | < 20 min |
@@ -35,7 +36,7 @@ Goal: every push proves the DLL still cross-compiles, pure code still passes tes
 - Runs in the same container image as local dev (`docker/build.Dockerfile`), so CI and laptop match. Build the image with `docker/build-push-action` and cache layers in the GitHub cache (`cache-from: type=gha`).
 - ccache state in `actions/cache` keyed by compiler version + hash of `CMakeLists.txt` and `cmake/deps.cmake`.
 - Builds both `win64-release` and `win64-probe`.
-- Verifies the output: `x86_64-w64-mingw32-objdump -p dinput8.dll` must export `DirectInput8Create` and must not import unexpected DLLs (allow-list: `KERNEL32`, `USER32`, `D3D11`, `DXGI`, `D3DCOMPILER_47`, `ntdll`, `msvcrt`). A static-runtime build should have no `libstdc++-6.dll` or `libgcc_s_seh-1.dll` import.
+- Verifies the output: `x86_64-w64-mingw32-objdump -p dinput8.dll` must export `DirectInput8Create`, enforce PE mitigations (`HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, `NX_COMPAT`), and must not import unexpected DLLs (allow-list: `KERNEL32`, `USER32`, `D3D11`, `DXGI`, `D3DCOMPILER_47`, `ntdll`, `msvcrt`). A static-runtime build should have no `libstdc++-6.dll` or `libgcc_s_seh-1.dll` import.
 - Uploads `dinput8.dll` (release and probe) plus `.pdb`-equivalent debug info (`.debug` split via `objcopy --only-keep-debug`) as artifacts.
 
 ### wine-smoke
@@ -140,11 +141,13 @@ Note: CI uses Ubuntu's `g++-mingw-w64-x86-64` while local dev uses Fedora's MinG
 
 ## 6. Repository hygiene and security
 
-- **Branch protection on `main`:** require PR, require `ci` checks, linear history. While solo, allow admin bypass but still use PRs for CI feedback.
-- **Dependabot** (`.github/dependabot.yml`): `github-actions` ecosystem weekly. Dependencies fetched by CMake `FetchContent` are not covered by Dependabot, hence the nightly `deps` job.
-- **CodeQL** for C/C++ (free for public repos). It needs a build; use the host build.
-- **Secret scanning and push protection:** enable in repo settings (free on public repos).
-- **Least privilege:** workflows default to `contents: read`; only `release.yml` gets `contents: write`, `id-token: write`, `attestations: write`.
+- **Branch protection & Auto-Merge on `main`:** require PR, require `ci` checks, linear history. While solo, `auto-merge.yml` approves and enables `--auto --squash` for Dependabot and repo PRs once all harsh checks pass.
+- **Dependabot** (`.github/dependabot.yml`): covers 3 ecosystems weekly — `github-actions` (`/` with grouped minor/patch bumps), `docker` (`/docker` base images), and `pip` (`/tools/py` Python host telemetry requirements) — plus automated Dependabot security updates enabled in repository settings. CMake `FetchContent` pins stay audited by HTTPS-only URL and immutable tag checks in `check-guards.sh`.
+- **CodeQL** for C/C++ (`.github/workflows/codeql.yml`, `security-extended` queries, free for public repos).
+- **Supply-Chain & Dependency Review** (`.github/workflows/security.yml`): runs `actions/dependency-review-action@v4` on PRs (blocking moderate+ CVEs) and validates `SECURITY.md`, workflow `permissions:`, and secret scanning (`gitleaks`).
+- **Secret scanning and push protection:** enabled in repo settings (free on public repos).
+- **Least privilege:** workflows default to `contents: read`; only `release.yml` and `auto-merge.yml` request targeted write scopes.
+- **Security Policy** ([`SECURITY.md`](../SECURITY.md)): documents the offline-only threat model, PE exploit mitigations (`HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, `NX_COMPAT`), zero-network telemetry guarantee, and GitHub Security Advisories reporting.
 - **Issue and PR templates** require: game build hash, OS/Proton version, GPU/driver, `soulsframe.log` attached, "offline only" checkbox.
 - **No self-hosted runners** on a public repo (untrusted PR code).
 - **Licensing:** add `LICENSE` before accepting contributions. Suggestion: MIT or Apache-2.0 for our code. Keep third-party licenses in `THIRD_PARTY_LICENSES.txt` (see `docs/07`).

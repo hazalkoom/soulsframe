@@ -90,4 +90,24 @@ if [ -n "$missing_docs" ]; then
   exit 1
 fi
 
+# 7. Verify repository security policy, HTTPS-only dependencies, and PE mitigations.
+if [ ! -f SECURITY.md ]; then
+  echo "Security guard failed: SECURITY.md is missing."
+  exit 1
+fi
+
+while IFS= read -r repo; do
+  if [[ ! "$repo" =~ ^https:// ]]; then
+    echo "Security guard failed: non-HTTPS GIT_REPOSITORY in cmake/deps.cmake: $repo"
+    exit 1
+  fi
+done < <(sed -nE 's/^\s*GIT_REPOSITORY\s+([^[:space:]]+).*/\1/p' cmake/deps.cmake)
+
+for flag in --dynamicbase --high-entropy-va --nxcompat; do
+  if ! grep -q -- "$flag" CMakeLists.txt; then
+    echo "Security guard failed: missing PE hardening linker flag $flag in CMakeLists.txt"
+    exit 1
+  fi
+done
+
 echo "All repository guards passed."

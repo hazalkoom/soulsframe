@@ -1,0 +1,65 @@
+name: Security Hardening & Supply-Chain Audit
+
+on:
+  push:
+    branches: [main, develop, "feat/**", "fix/**", "test/**", "docs/**", "ci/**"]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "17 3 * * 2"
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Dependency Review (block moderate+ CVEs and incompatible licenses)
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0-only, AGPL-3.0-only
+
+  supply-chain-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full history for secret audit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify security policy, HTTPS pins, and workflow least-privilege permissions
+        run: |
+          bash scripts/ci/check-guards.sh
+          for wf in .github/workflows/*.yml; do
+            if ! grep -q '^permissions:' "$wf"; then
+              echo "Workflow missing top-level least-privilege permissions block: $wf"
+              exit 1
+            fi
+          done
+          if grep -rnE '^\s*(docker|pip|github-actions)' .github/dependabot.yml >/dev/null 2>&1; then
+            echo "Dependabot configuration validated."
+          fi
+
+      - name: Self-test Python capture analyzer
+        run: python3 tools/py/analyze_capture.py --self-test
+
+      - name: Scan git history and workspace with gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --verbose --redact --exit-code 1

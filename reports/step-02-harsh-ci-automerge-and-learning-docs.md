@@ -25,17 +25,21 @@ Expanded all 8 suites under [tests/unit/](../tests/unit/):
 - [test_module_registry.cpp](../tests/unit/test_module_registry.cpp): null registration safety plus injected exceptions across `init()`, `on_present()`, and `shutdown()`.
 - [test_profile.cpp](../tests/unit/test_profile.cpp): uppercase normalization and empty-hash safe fallback.
 
-### C. Harsh CI Pipeline, Security Scanning, Multi-Scenario Wine Smoke & Auto-Merge
+### C. Harsh CI Pipeline, Security Hardening, Dependabot PRs & Auto-Merge
 
-- Added [.markdownlint-cli2.jsonc](../.markdownlint-cli2.jsonc) and [.sonarcloud.properties](../.sonarcloud.properties), and removed `continue-on-error: true` from `docs` CI job.
-- Expanded [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh) to enforce offline-default safety, zero DS3 RVA leakage outside `src/games/ds3/`, pinned `FetchContent` tags, `THIRD_PARTY_LICENSES.txt` completeness, and `///` header docstring coverage.
+- Added [.markdownlint-cli2.jsonc](../.markdownlint-cli2.jsonc) and [.sonarcloud.properties](../.sonarcloud.properties), removed `continue-on-error: true` from `docs` CI job, and indented JSON blocks inside ordered lists in [docs/08-logging-and-telemetry.md](../docs/08-logging-and-telemetry.md).
+- Hardened Windows PE binaries in [CMakeLists.txt](../CMakeLists.txt) with `-Wl,--dynamicbase`, `-Wl,--high-entropy-va`, and `-Wl,--nxcompat` for both `dinput8.dll` and `d3d11_testbed.exe`, and asserted `HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, and `NX_COMPAT` in the `win64` CI `objdump -p` audit.
+- Added [SECURITY.md](../SECURITY.md) (offline threat model, PE mitigations, supply-chain pinning, GitHub Security Advisories workflow) and [.github/workflows/security.yml](../.github/workflows/security.yml) (`dependency-review` + `supply-chain-audit`).
+- Expanded [.github/dependabot.yml](../.github/dependabot.yml) from `github-actions` alone to 3 ecosystems (`github-actions` with grouped minor/patch bumps, `docker` for `/docker`, and `pip` for `/tools/py`), paired with [tools/py/requirements.txt](../tools/py/requirements.txt) and [tools/py/analyze_capture.py](../tools/py/analyze_capture.py) (`--self-test`).
+- Expanded [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh) to 7 guards covering forbidden binaries, pure-C++ layering, offline-default safety, zero DS3 RVA leakage outside `src/games/ds3/`, pinned HTTPS `FetchContent` dependencies, `THIRD_PARTY_LICENSES.txt` completeness, `///` header docstrings, `SECURITY.md`, and PE hardening flags.
 - Expanded [scripts/smoke-test.sh](../scripts/smoke-test.sh) into a 3-scenario headless Wine + Xvfb verification suite:
   1. Unacknowledged config blocks initialization (`OFFLINE GUARD BLOCKED MOD INIT`).
   2. Opt-in 300-frame run with `--resize` verifies `Present`, `ResizeBuffers`, frame telemetry, and clean shutdown (`total_frames=300`).
   3. Opt-in 150-frame run with `--msaa 4` verifies MSAA 4x swapchain hook stability (`total_frames=150`).
 - Upgraded [.github/workflows/ci.yml](../.github/workflows/ci.yml) and [.github/workflows/release.yml](../.github/workflows/release.yml) with `actions/checkout@v7`, `actions/cache@v6`, `actions/upload-artifact@v7`, `DavidAnson/markdownlint-cli2-action@v25`, `gitleaks` secret scanning, `static-analysis` (`clang-format`, `clang-tidy`, `cppcheck`), `-DSF_WERROR=ON` across all builds, and `docker-verify`.
 - Created [.github/workflows/codeql.yml](../.github/workflows/codeql.yml), [.github/workflows/auto-merge.yml](../.github/workflows/auto-merge.yml), and [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md), and enhanced [.github/copilot-instructions.md](../.github/copilot-instructions.md).
-- Enabled GitHub repository `allow_auto_merge=true` and `delete_branch_on_merge=true`.
+- Enabled GitHub repository `allow_auto_merge=true`, `delete_branch_on_merge=true`, Dependabot vulnerability alerts, and Dependabot automated security updates.
+- Audited Dependabot PRs `#1`–`#4` (`actions/upload-artifact@v7`, `actions/checkout@v7`, `actions/cache@v6`, `DavidAnson/markdownlint-cli2-action@v25`): resolved stale-base/lint root causes on branch, approved each PR, and merged `origin/pr/1..4` with `-X ours` into `main` ancestry.
 
 ### D. Educational Documentation for Learners & Vibe Coders
 
@@ -44,8 +48,8 @@ Expanded all 8 suites under [tests/unit/](../tests/unit/):
 
 ## 2. Local Verification Results
 
-- `bash scripts/ci/check-guards.sh`: Passed (all 6 guard categories green).
-- `cmake --preset host-tests -DSF_WERROR=ON && cmake --build --preset host-tests && ctest --preset host-tests --output-on-failure`: Passed (`23/23` test cases, `605/605` assertions, zero warnings under `-Werror`).
+- `bash scripts/ci/check-guards.sh`: Passed (all 7 guard categories green, including `SECURITY.md`, HTTPS pins, and PE mitigation flags).
+- `python3 tools/py/analyze_capture.py --self-test`: Passed cleanly (`analyze_capture.py self-test OK`).
+- `cmake --build --preset host-tests && ctest --preset host-tests --output-on-failure`: Passed (`23/23` test cases, `605/605` assertions, `SF_WERROR=ON`).
 - `clang-format --dry-run --Werror` across all `src/` and `tests/` headers/sources (inside `sf-build`): Passed cleanly.
-- `clang-tidy --warnings-as-errors='*'` across all 8 pure C++ implementation files (inside `sf-build`): Passed with exit code `0`.
-- `win64-release` MinGW-w64 build (`-DSF_WERROR=ON`) + 3-scenario Wine + Xvfb smoke test inside `sf-wine-test`: Passed (`smoke-result.json` status `"ok"`).
+- `win64-release` MinGW-w64 build (`-DSF_WERROR=ON`) + `x86_64-w64-mingw32-objdump -p build/win64-release/dinput8.dll`: Verified `DirectInput8Create` export and PE mitigations `HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, `NX_COMPAT`.

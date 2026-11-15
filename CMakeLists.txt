@@ -61,6 +61,11 @@ if(NOT SF_HOST_ONLY)
     -static-libgcc
     -static-libstdc++
   )
+  target_link_options(soulsframe PRIVATE
+    -Wl,--dynamicbase
+    -Wl,--high-entropy-va
+    -Wl,--nxcompat
+  )
   if(SF_PROBE)
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
   endif()
@@ -74,6 +79,11 @@ if(NOT SF_HOST_ONLY)
       -static
       -static-libgcc
       -static-libstdc++
+    )
+    target_link_options(d3d11_testbed PRIVATE
+      -Wl,--dynamicbase
+      -Wl,--high-entropy-va
+      -Wl,--nxcompat
     )
   endif()
 else()
