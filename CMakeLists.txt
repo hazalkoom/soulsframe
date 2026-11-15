@@ -1,0 +1,75 @@
+cmake_minimum_required(VERSION 3.25)
+project(soulsframe LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(SF_PROBE "Build RE/telemetry features" OFF)
+option(SF_HOST_ONLY "Build only the native pure-C++ parts (tests/tools)" OFF)
+option(SF_SANITIZE "Enable Address and UndefinedBehavior sanitizers on host builds" OFF)
+option(SF_BUILD_TESTBED "Build the D3D11 smoke-testbed executable" OFF)
+
+include(cmake/deps.cmake)
+
+add_library(soulsframe_core STATIC
+  src/core/config.cpp
+  src/core/module_registry.cpp
+  src/core/offline_guard.cpp
+  src/core/sha256.cpp
+  src/games/ds3/profile.cpp
+  src/hooks/sigscan.cpp
+  src/tex/content_hash.cpp
+  src/timing/frame_stats.cpp
+)
+target_include_directories(soulsframe_core PUBLIC src)
+target_compile_options(soulsframe_core PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::xxhash)
+
+if(SF_HOST_ONLY AND SF_SANITIZE)
+  target_compile_options(soulsframe_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+  target_link_options(soulsframe_core PUBLIC -fsanitize=address,undefined)
+endif()
+
+if(NOT SF_HOST_ONLY)
+  add_library(soulsframe SHARED
+    src/core/dllmain.cpp
+    src/core/log.cpp
+    src/core/proxy_dinput8.cpp
+    src/core/win_helpers.cpp
+    src/gfx/d3d11/swapchain_hook.cpp
+  )
+  target_include_directories(soulsframe PRIVATE src)
+  set_target_properties(soulsframe PROPERTIES
+    OUTPUT_NAME "dinput8"
+    PREFIX ""
+  )
+  target_compile_options(soulsframe PRIVATE -Wall -Wextra -Wpedantic)
+  target_link_libraries(soulsframe PRIVATE
+    soulsframe_core
+    minhook
+    d3d11
+    dxgi
+    -static
+    -static-libgcc
+    -static-libstdc++
+  )
+  if(SF_PROBE)
+    target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
+  endif()
+
+  if(SF_BUILD_TESTBED)
+    add_executable(d3d11_testbed tests/testbed/d3d11_testbed.cpp)
+    target_compile_options(d3d11_testbed PRIVATE -Wall -Wextra)
+    target_link_libraries(d3d11_testbed PRIVATE
+      d3d11
+      dxgi
+      -static
+      -static-libgcc
+      -static-libstdc++
+    )
+  endif()
+else()
+  enable_testing()
+  add_subdirectory(tests/unit)
+endif()

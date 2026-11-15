@@ -1,7 +1,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, develop, "feat/**", "test/**", "docs/**"]
   pull_request:
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,45 +14,96 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: No game files or huge blobs
-        run: |
-          bad=$(git ls-files | grep -Ei '\.(exe|dll|bdt|bhd|dcx|tpf|bnd|fxr|zip)$' || true)
-          [ -z "$bad" ] || { echo "Forbidden files tracked:"; echo "$bad"; exit 1; }
-          big=$(git ls-files -z | xargs -0 du -k | awk '$1 > 5120 {print $2}')
-          [ -z "$big" ] || { echo "Files over 5 MB:"; echo "$big"; exit 1; }
+      - name: Run repository & layering guards
+        run: bash scripts/ci/check-guards.sh
 
   host-tests:
     needs: guards
-    if: hashFiles('CMakePresets.json') != ''
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cxx: [g++, clang++]
+        include:
+          - preset: host-tests
+            cxx: g++
+          - preset: host-tests
+            cxx: clang++
+          - preset: host-asan
+            cxx: g++
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build cmake clang
-      - run: cmake --preset host-tests -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
-      - run: cmake --build --preset host-tests
-      - run: ctest --preset host-tests
+      - run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }}
 
   win64:
     needs: guards
-    if: hashFiles('CMakePresets.json') != ''
     runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:43
     steps:
+      - name: Install Fedora MinGW toolchain
+        run: |
+          dnf -y install cmake ninja-build ccache git \
+            mingw64-gcc-c++ mingw64-winpthreads-static mingw64-headers mingw64-crt binutils
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-mingw-w64-x86-64 ccache
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
           key: ccache-win64-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
           restore-keys: ccache-win64-
-      - run: cmake --preset win64-release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
-      - run: cmake --build --preset win64-release
+      - name: Build win64-release
+        run: |
+          cmake --preset win64-release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          cmake --build --preset win64-release
+      - name: Build win64-probe
+        run: |
+          cmake --preset win64-probe -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          cmake --build --preset win64-probe
+      - name: Audit DLL exports and imports
+        run: |
+          x86_64-w64-mingw32-objdump -p build/win64-release/dinput8.dll > objdump.txt
+          grep -q "DirectInput8Create" objdump.txt
+          if grep -Eqi "libstdc\+\+|libgcc_s|libwinpthread" objdump.txt; then
+            echo "Unexpected runtime DLL dependency in static build!"
+            cat objdump.txt
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: dinput8-win64
-          path: build/win64-release/dinput8.dll
+          path: |
+            build/win64-release/dinput8.dll
+            build/win64-release/d3d11_testbed.exe
+            build/win64-probe/dinput8.dll
+
+  wine-smoke:
+    needs: win64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dinput8-win64
+          path: build/win64-release
+      - name: Install Wine and Xvfb
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y wine64 xvfb
+      - name: Run Wine D3D11 smoke test
+        env:
+          WINEDEBUG: -all
+          WINEDLLOVERRIDES: "dinput8=n,b;mscoree,mshtml="
+        run: |
+          wineboot -i || true
+          bash scripts/smoke-test.sh "$PWD/build/win64-release"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs
+          path: |
+            build/win64-release/soulsframe.log
+            build/win64-release/smoke-result.json
 
   docs:
     runs-on: ubuntu-latest

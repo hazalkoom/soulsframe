@@ -38,6 +38,10 @@ It also ships a **reverse-engineering toolkit** (`sf-probe` inside the DLL, `sft
 | [`docs/05-testing-strategy.md`](docs/05-testing-strategy.md) | You want to know how we test: unit, fuzz, shader, Wine smoke, in-game, perf regression. |
 | [`docs/06-ci-cd-github-actions.md`](docs/06-ci-cd-github-actions.md) | You want the GitHub Actions design: CI, nightly, release, security hygiene. |
 | [`docs/07-open-source-tools.md`](docs/07-open-source-tools.md) | You want the vetted list of open-source libraries/tools, licenses, and spikes. |
+| [`docs/08-logging-and-telemetry.md`](docs/08-logging-and-telemetry.md) | You want the runtime logging, JSONL capture schema, and extraction plan. |
+| [`docs/09-codebase-reference.md`](docs/09-codebase-reference.md) | You want a file-by-file map of every module and symbol implemented so far. |
+| [`docs/guide-for-vibe-coders.md`](docs/guide-for-vibe-coders.md) | You want a plain-English walkthrough of how the mod works without deep C++/DirectX jargon. |
+| [`AGENTS.md`](AGENTS.md) | You are (or are prompting) an AI coding agent working in this repository. |
 
 ## Quick start (about 30 minutes to a loaded DLL)
 
