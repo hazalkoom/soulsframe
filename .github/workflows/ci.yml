@@ -97,6 +97,81 @@ jobs:
       - run: cmake --build --preset ${{ matrix.preset }}
       - run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
+  coverage:
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build and coverage tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build cmake g++ lcov python3-pip
+          python3 -m pip install --break-system-packages gcovr
+      - name: Build host-cov and enforce minimum line coverage
+        env:
+          SF_MIN_LINE_COVERAGE: "90"
+        run: bash scripts/ci/run-coverage.sh
+      - name: Publish coverage summary
+        run: |
+          python3 - <<'PY'
+          import json, os
+          data = json.load(open("build/host-cov/report/summary.json"))
+          rows = [
+              "## Code Coverage Report (`host-cov`)",
+              "",
+              f"- **Total Lines:** {data['line_percent']:.1f}% ({data['line_covered']}/{data['line_total']})",
+              f"- **Total Functions:** {data['function_percent']:.1f}% ({data['function_covered']}/{data['function_total']})",
+              f"- **Total Branches:** {data['branch_percent']:.1f}% ({data['branch_covered']}/{data['branch_total']})",
+              "",
+              "| File | Lines | Functions | Branches |",
+              "|---|---|---|---|",
+          ]
+          for f in data["files"]:
+              lp = (100.0 * f["line_covered"] / f["line_total"]) if f["line_total"] else 100.0
+              fp = (100.0 * f["function_covered"] / f["function_total"]) if f["function_total"] else 100.0
+              bp = (100.0 * f["branch_covered"] / f["branch_total"]) if f["branch_total"] else 100.0
+              rows.append(f"| `{f['filename']}` | {lp:.1f}% ({f['line_covered']}/{f['line_total']}) | {fp:.1f}% | {bp:.1f}% |")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(rows) + "\n")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-report
+          path: build/host-cov/report/
+
+  fuzz-smoke:
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install clang and build deps
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake clang
+      - name: Build instrumented core for libFuzzer
+        run: |
+          cmake -B build/host-fuzz -G Ninja \
+            -DSF_HOST_ONLY=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_FLAGS="-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
+            -DSF_WERROR=ON
+          cmake --build build/host-fuzz --target soulsframe_core
+      - name: Build and run libFuzzer targets (10s each)
+        run: |
+          clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc -Ibuild/host-fuzz/_deps/tomlplusplus-src/include \
+            tests/fuzz/fuzz_config.cpp \
+            build/host-fuzz/libsoulsframe_core.a build/host-fuzz/_deps/xxhash-build/libxxhash.a \
+            -o build/host-fuzz/fuzz_config
+          clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc \
+            tests/fuzz/fuzz_sigscan.cpp \
+            build/host-fuzz/libsoulsframe_core.a build/host-fuzz/_deps/xxhash-build/libxxhash.a \
+            -o build/host-fuzz/fuzz_sigscan
+          ./build/host-fuzz/fuzz_config tests/fuzz/corpus/config -max_total_time=10
+          ./build/host-fuzz/fuzz_sigscan tests/fuzz/corpus/sigscan -max_total_time=10
+
   win64:
     needs: guards
     runs-on: ubuntu-latest
