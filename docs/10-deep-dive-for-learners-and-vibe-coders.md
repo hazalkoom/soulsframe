@@ -133,7 +133,7 @@ Modding an online-enabled FromSoftware game carries permanent anti-cheat/ban ris
 
 Look at [CMakeLists.txt](../CMakeLists.txt) and [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh). All business logic (`config`, `offline_guard`, `module_registry`, `sha256`, `sigscan`, `probe/trace_types`, `probe/jsonl_writer`, `content_hash`, `frame_stats`, `ds3/profile`) lives in **pure C++20** with **zero** `<windows.h>`, `<d3d11.h>`, or `<dxgi.h>` includes.
 
-Result: you can compile and run **29 test cases / 675 assertions** natively on Linux in **under a second** without booting Windows or Dark Souls III!
+Result: you can compile and run **29 test cases / 681 assertions** natively on Linux in **under a second** without booting Windows or Dark Souls III!
 
 And notice why the M2 tracer ([src/gfx/d3d11/context_hook.cpp](../src/gfx/d3d11/context_hook.cpp) + [src/probe/probe_module.cpp](../src/probe/probe_module.cpp)) never blocks `Present()` on disk I/O and never deadlocks the Windows OS Loader Lock: `Draw*` hooks push snapshots into memory and wake a dedicated background writer thread (`writer_loop`), which joins cleanly when `capture_frames` completes (or uses a non-blocking flush wait + `detach()` if torn down inside `DLL_PROCESS_DETACH`).
 

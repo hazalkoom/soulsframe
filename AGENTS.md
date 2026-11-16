@@ -2,7 +2,7 @@
 
 Welcome! This file gives AI assistants the rules, architecture boundaries, commands, and current status for **SoulsFrame**, a native C++20 `dinput8.dll` proxy mod for Dark Souls III (x64, D3D11) cross-compiled from Linux with MinGW-w64.
 
-Read [README.md](README.md) and [docs/01-architecture-and-roadmap.md](docs/01-architecture-and-roadmap.md) first if you are starting a fresh session.
+Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-architecture-and-roadmap.md), and [docs/09-codebase-reference.md](docs/09-codebase-reference.md) first if you are starting a fresh session. If orchestrating **OpenCode + Antigravity (AGY)** together, also read [docs/11-ai-agent-orchestration-opencode-agy.md](docs/11-ai-agent-orchestration-opencode-agy.md) and [docs/12-ai-agent-playbooks-and-roles.md](docs/12-ai-agent-playbooks-and-roles.md).
 
 ## Non-negotiable project rules
 
@@ -54,3 +54,10 @@ Read [README.md](README.md) and [docs/01-architecture-and-roadmap.md](docs/01-ar
 
 - Commit and push frequently in small, focused steps using Conventional Commit prefixes (`feat:`, `fix:`, `test:`, `build:`, `ci:`, `docs:`, `report:`).
 - Update [docs/09-codebase-reference.md](docs/09-codebase-reference.md) when adding modules or changing execution flow.
+
+## Multi-agent orchestration (OpenCode + Antigravity / AGY)
+
+- **Workspace separation:** Run Antigravity in the primary checkout and OpenCode in an isolated sibling worktree (`git worktree add ../soulsframe-oc -b feat/oc-work origin/main`) so builds and edits never collide.
+- **Suggested split:** OpenCode owns fast Linux pure-C++ modules, `doctest` unit tests, `libFuzzer` targets, `gcovr` loops, and `tools/py/`; Antigravity owns architecture/coordination, `src/gfx/d3d11/` hooks, `sf-build` MinGW cross-compiles, `sf-wine-test` runs, CI triage, and merges.
+- **Static-analysis defaults:** Always use `std::array` (never raw C arrays), designated initializers on aggregates, `{buf.data()}` braced returns for `std::string`, `std::cmp_less`/`std::cmp_greater`, and `std::ranges::transform` so `clang-tidy` and `cppcheck` stay 100% green.
+- **Full playbooks & copy-paste handoffs:** See [docs/11-ai-agent-orchestration-opencode-agy.md](docs/11-ai-agent-orchestration-opencode-agy.md) and [docs/12-ai-agent-playbooks-and-roles.md](docs/12-ai-agent-playbooks-and-roles.md).
