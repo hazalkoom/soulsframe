@@ -95,9 +95,9 @@ Effort figures assume part-time solo work. Treat them as rough.
 
 | # | Milestone | Done when | Rough effort |
 |---|---|---|---|
-| **M0** | Toolchain + containers | `just build` produces `dinput8.dll`; Wine smoke test passes in CI | 1-2 days |
-| **M1** | First light | DLL loads under Proton; `Present` hooked; frame-time log | 2-4 days |
-| **M2** | Probe v1 | Draw-call tracer with call-site aggregation; pass boundary detection; resource list; JSON export; Python analysis script | 1-2 weeks |
+| **M0** | Toolchain + containers (**Done**) | `just build` produces `dinput8.dll`; Wine smoke test passes in CI | 1-2 days |
+| **M1** | First light (**Done**) | DLL loads under Proton; `Present` hooked; frame-time log | 2-4 days |
+| **M2** | Probe v1 (**Done**) | Draw-call tracer with call-site aggregation; pass boundary detection; resource list; JSONL export; Python analysis script | 1-2 weeks |
 | **M3** | GPU pass timing + benchmark harness | Per-pass GPU ms; repeatable benchmark routes; baseline report committed | 1 week |
 | **M4** | RE foundation | Clean memory dump of the unpacked exe in Ghidra; time-API tracer finds frame limiter and dt sources; signature DB with SHA-256 key | 1-3 weeks |
 | **M5** | Presentation fixes | Flip-model/pacing experiment with measured result (keep or drop) | 1 week |

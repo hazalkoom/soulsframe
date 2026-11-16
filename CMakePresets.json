@@ -41,13 +41,21 @@
       "cacheVariables": {
         "SF_SANITIZE": "ON"
       }
+    },
+    {
+      "name": "host-cov",
+      "inherits": "host-tests",
+      "cacheVariables": {
+        "SF_COVERAGE": "ON"
+      }
     }
   ],
   "buildPresets": [
     { "name": "win64-release", "configurePreset": "win64-release" },
     { "name": "win64-probe",   "configurePreset": "win64-probe" },
     { "name": "host-tests",    "configurePreset": "host-tests" },
-    { "name": "host-asan",     "configurePreset": "host-asan" }
+    { "name": "host-asan",     "configurePreset": "host-asan" },
+    { "name": "host-cov",      "configurePreset": "host-cov" }
   ],
   "testPresets": [
     {
@@ -58,6 +66,11 @@
     {
       "name": "host-asan",
       "configurePreset": "host-asan",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "host-cov",
+      "configurePreset": "host-cov",
       "output": { "outputOnFailure": true }
     }
   ]

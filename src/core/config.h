@@ -38,7 +38,20 @@ struct Config {
   struct Modules {
     bool frame_telemetry = true;
     bool presentation = false;
+    bool probe_tracer = false;
   } modules;
+
+  /// Settings for `SF_PROBE` draw-call and pass JSONL capture builds.
+  struct Probe {
+    /// Maximum frames to write per capture session (clamped to [1, 36000]).
+    uint32_t capture_frames = 120;
+
+    /// Output JSONL filename written alongside `dinput8.dll`.
+    std::string output_file = "soulsframe_capture.jsonl";
+
+    /// Record unique active D3D11 textures/render-targets alongside draw sites.
+    bool trace_resources = true;
+  } probe;
 
   /// Returns a `Config` populated with safe, conservative defaults.
   static Config defaults();

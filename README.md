@@ -1,6 +1,6 @@
 # SoulsFrame: Dark Souls III performance and frame-pacing mod
 
-> Status: **planning, v2.** Scope is **DS3 only**. Elden Ring comes later, as a separate renderer backend (see `docs/01`).
+> Status: **M0–M2 implemented** (proxy + SwapChain timing + `sf-probe` v1 draw-call tracer + coverage & fuzz CI). Scope is **DS3 only**; Elden Ring comes later as a separate renderer backend (`docs/01`).
 > Dev host: Fedora Linux. Output: a Windows x64 `dinput8.dll` proxy mod, cross-compiled with MinGW-w64.
 
 ## What this is
@@ -42,8 +42,10 @@ It also ships a **reverse-engineering toolkit** (`sf-probe` inside the DLL, `sft
 | [`docs/09-codebase-reference.md`](docs/09-codebase-reference.md) | You want a file-by-file map of every module and symbol implemented so far. |
 | [`docs/guide-for-vibe-coders.md`](docs/guide-for-vibe-coders.md) | You want a quick plain-English tour of how the mod works without deep C++/DirectX jargon. |
 | [`docs/10-deep-dive-for-learners-and-vibe-coders.md`](docs/10-deep-dive-for-learners-and-vibe-coders.md) | You want a zero-to-systems masterclass explaining DLL proxying, COM vtables, MinHook, harsh CI, safe recipes, and career leverage. |
+| [`docs/11-ai-agent-orchestration-opencode-agy.md`](docs/11-ai-agent-orchestration-opencode-agy.md) | You want to orchestrate **OpenCode + Antigravity (AGY)** side-by-side cleanly using Git worktrees and structured handoffs. |
+| [`docs/12-ai-agent-playbooks-and-roles.md`](docs/12-ai-agent-playbooks-and-roles.md) | You want AI specialist role checklists, `clang-tidy`/`cppcheck` idioms, and real M0–M2 bug post-mortems. |
 | [`SECURITY.md`](SECURITY.md) | You want our offline safety threat model, PE binary mitigations (`HIGH_ENTROPY_VA`, `DYNAMIC_BASE`, `NX_COMPAT`), supply-chain policy, and vulnerability reporting instructions. |
-| [`AGENTS.md`](AGENTS.md) | You are (or are prompting) an AI coding agent working in this repository. |
+| [`AGENTS.md`](AGENTS.md) | You are (or are prompting) an AI coding agent (**OpenCode**, **Antigravity**, etc.) working in this repository. |
 
 ## Quick start (about 30 minutes to a loaded DLL)
 
