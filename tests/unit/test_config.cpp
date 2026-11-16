@@ -69,6 +69,16 @@ TEST_CASE("config invalid TOML falls back to defaults") {
   const auto bad_hdr = sf::parse_config_toml("[%general]\noffline_acknowledged = true\n");
   CHECK_FALSE(bad_hdr.parsed_ok);
   CHECK_FALSE(bad_hdr.config.general.offline_acknowledged);
+
+  // Non-ASCII bytes (e.g. U+00C2) must fail cleanly without hitting upstream UTF-8 UB,
+  // while a leading UTF-8 BOM before valid ASCII TOML is tolerated.
+  const auto non_ascii = sf::parse_config_toml("[general]\noff\xC3\x82ne = true\n");
+  CHECK_FALSE(non_ascii.parsed_ok);
+  CHECK_FALSE(non_ascii.config.general.offline_acknowledged);
+
+  const auto bom_ok = sf::parse_config_toml("\xEF\xBB\xBF[present]\nmax_fps = 90\n");
+  CHECK(bom_ok.parsed_ok);
+  CHECK(bom_ok.config.present.max_fps == 90);
 }
 
 TEST_CASE("config handles adversarial types, negative bounds, null bytes, and large comments") {

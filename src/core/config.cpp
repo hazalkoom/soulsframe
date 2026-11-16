@@ -64,11 +64,20 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   ConfigParseResult out;
   out.config = Config::defaults();
 
-  // Reject NUL bytes before handing off to toml++ so malformed binary inputs cannot hit
-  // parser debug assertions.
-  if (toml_text.find('\0') != std::string_view::npos) {
+  // Strip optional UTF-8 BOM and reject control/non-ASCII bytes before calling toml++ so
+  // malformed binary inputs cannot hit upstream unicode bitmask/parser invariants.
+  if (toml_text.size() >= 3 && static_cast<unsigned char>(toml_text[0]) == 0xEFU &&
+      static_cast<unsigned char>(toml_text[1]) == 0xBBU &&
+      static_cast<unsigned char>(toml_text[2]) == 0xBFU) {
+    toml_text.remove_prefix(3);
+  }
+  const bool has_disallowed = std::ranges::any_of(toml_text, [](unsigned char ch) {
+    return (ch < 0x20U && ch != '\t' && ch != '\n' && ch != '\r') || ch >= 0x7FU;
+  });
+  if (has_disallowed) {
     out.parsed_ok = false;
-    out.warnings.emplace_back("TOML parse error: embedded NUL byte is not allowed");
+    out.warnings.emplace_back(
+        "TOML parse error: unsupported control or non-ASCII byte is not allowed");
     return out;
   }
 
