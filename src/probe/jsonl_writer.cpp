@@ -1,7 +1,9 @@
 #include "probe/jsonl_writer.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
+#include <iterator>
 
 namespace sf::probe {
 
@@ -128,17 +130,17 @@ std::vector<std::string> serialize_frame_snapshot(const FrameTraceSnapshot& snap
   std::vector<std::string> lines;
   lines.reserve(1U + snap.new_resources.size() + snap.passes.size() + snap.call_sites.size());
 
-  for (const auto& res : snap.new_resources) {
-    lines.push_back(format_resource_event(snap.frame_index, res));
-  }
+  std::ranges::transform(
+      snap.new_resources, std::back_inserter(lines),
+      [&](const ResourceSummary& res) { return format_resource_event(snap.frame_index, res); });
   lines.push_back(format_frame_event(snap.frame_index, cpu_frame_ms, snap.total_draw_calls,
                                      snap.total_elements));
-  for (const auto& pass : snap.passes) {
-    lines.push_back(format_pass_event(snap.frame_index, pass));
-  }
-  for (const auto& site : snap.call_sites) {
-    lines.push_back(format_draw_site_event(snap.frame_index, site));
-  }
+  std::ranges::transform(snap.passes, std::back_inserter(lines), [&](const PassSummary& pass) {
+    return format_pass_event(snap.frame_index, pass);
+  });
+  std::ranges::transform(
+      snap.call_sites, std::back_inserter(lines),
+      [&](const CallSiteStats& site) { return format_draw_site_event(snap.frame_index, site); });
   return lines;
 }
 

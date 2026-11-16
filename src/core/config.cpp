@@ -5,6 +5,10 @@
 #include <fstream>
 #include <span>
 #include <sstream>
+// Upstream toml++ v3.4.0 triggers an internal debug assertion on invalid bare key starts inside
+// malformed table headers (e.g. `[%...]`) before reaching its own parse-error branch. Disabling
+// internal asserts delegates cleanly to toml::parse_error instead of aborting.
+#define TOML_ASSERT(expr) static_assert(true)
 #include <toml++/toml.hpp>
 #include <utility>
 

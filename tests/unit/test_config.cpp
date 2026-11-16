@@ -64,6 +64,11 @@ TEST_CASE("config invalid TOML falls back to defaults") {
   CHECK_FALSE(res.config.general.offline_acknowledged);
   CHECK(res.config.present.mode == "game");
   CHECK_FALSE(res.warnings.empty());
+
+  // Malformed table header characters must return a parse error cleanly, never assert/abort.
+  const auto bad_hdr = sf::parse_config_toml("[%general]\noffline_acknowledged = true\n");
+  CHECK_FALSE(bad_hdr.parsed_ok);
+  CHECK_FALSE(bad_hdr.config.general.offline_acknowledged);
 }
 
 TEST_CASE("config handles adversarial types, negative bounds, null bytes, and large comments") {
