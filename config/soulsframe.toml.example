@@ -16,3 +16,10 @@ max_fps = 0
 [modules]
 frame_telemetry = true
 presentation = false
+probe_tracer = false
+
+[probe]
+# Only used in SF_PROBE builds when modules.probe_tracer = true.
+capture_frames = 120
+output_file = "soulsframe_capture.jsonl"
+trace_resources = true

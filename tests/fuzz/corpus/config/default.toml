@@ -1,0 +1,12 @@
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "debug"
+
+[present]
+mode = "game"
+max_fps = 120
+
+[modules]
+frame_telemetry = true
+presentation = false

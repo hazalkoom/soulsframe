@@ -1,0 +1,2 @@
+sample probe payload with "quotes", newlines
+and binary markers!

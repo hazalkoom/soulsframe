@@ -131,9 +131,11 @@ Modding an online-enabled FromSoftware game carries permanent anti-cheat/ban ris
 
 ### 6. The "Pure Brain" vs "Windows Hands" Split
 
-Look at [CMakeLists.txt](../CMakeLists.txt) and [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh). All business logic (`config`, `offline_guard`, `module_registry`, `sha256`, `sigscan`, `content_hash`, `frame_stats`, `ds3/profile`) lives in **pure C++20** with **zero** `<windows.h>`, `<d3d11.h>`, or `<dxgi.h>` includes.
+Look at [CMakeLists.txt](../CMakeLists.txt) and [scripts/ci/check-guards.sh](../scripts/ci/check-guards.sh). All business logic (`config`, `offline_guard`, `module_registry`, `sha256`, `sigscan`, `probe/trace_types`, `probe/jsonl_writer`, `content_hash`, `frame_stats`, `ds3/profile`) lives in **pure C++20** with **zero** `<windows.h>`, `<d3d11.h>`, or `<dxgi.h>` includes.
 
-Result: you can compile and run **23 test cases / 605 assertions** natively on Linux in **0.06 seconds** without booting Windows or Dark Souls III!
+Result: you can compile and run **29 test cases / 681 assertions** natively on Linux in **under a second** without booting Windows or Dark Souls III!
+
+And notice why the M2 tracer ([src/gfx/d3d11/context_hook.cpp](../src/gfx/d3d11/context_hook.cpp) + [src/probe/probe_module.cpp](../src/probe/probe_module.cpp)) never blocks `Present()` on disk I/O and never deadlocks the Windows OS Loader Lock: `Draw*` hooks push snapshots into memory and wake a dedicated background writer thread (`writer_loop`), which joins cleanly when `capture_frames` completes (or uses a non-blocking flush wait + `detach()` if torn down inside `DLL_PROCESS_DETACH`).
 
 ---
 
@@ -151,8 +153,10 @@ SoulsFrame builds an **automated multi-gate safety net** in [.github/workflows/c
 | Harsh Static Analysis | Bug-prone patterns, C++20 safety, dead code (`clang-tidy --warnings-as-errors='*'` + `cppcheck --error-exitcode=1`) | [.clang-tidy](../.clang-tidy) |
 | Security SAST (`CodeQL`) | Buffer overflows, taint bugs, C/C++ security vulnerabilities (`security-extended`) | [.github/workflows/codeql.yml](../.github/workflows/codeql.yml) |
 | Compiler `-Werror` + ASan/UBSan | Memory out-of-bounds, use-after-free, undefined behavior across both `g++` and `clang++` | [CMakeLists.txt](../CMakeLists.txt), [CMakePresets.json](../CMakePresets.json) |
+| Code Coverage Gate (`gcovr`) | Regressions below 90% line coverage across pure C++ core & probe logic | [scripts/ci/run-coverage.sh](../scripts/ci/run-coverage.sh) |
+| Continuous Fuzzing (`libFuzzer`) | Crashers, hangs, or UB on hostile config/byte-pattern/JSONL inputs (`fuzz_config`, `fuzz_sigscan`, `fuzz_probe_jsonl`) | [tests/fuzz/](../tests/fuzz/) |
 | MinGW Cross-Compile + Import Audit | Ensures static binary (`DirectInput8Create` exported, zero dynamic `libstdc++`/`libgcc_s`/`libwinpthread` DLL leaks) | [docker/build.Dockerfile](../docker/build.Dockerfile) |
-| 3-Scenario Wine + Xvfb D3D11 Smoke | Boots a real D3D11 window loading our `dinput8.dll`: verifies offline block, 300-frame resize hooking, and 150-frame MSAA 4x stability | [scripts/smoke-test.sh](../scripts/smoke-test.sh), [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) |
+| 4-Scenario Wine + Xvfb D3D11 Smoke | Boots a real D3D11 window loading our `dinput8.dll`: verifies offline block, 300-frame resize hooking, 150-frame MSAA 4x stability, and 20-frame `SF_PROBE` JSONL draw/particle capture | [scripts/smoke-test.sh](../scripts/smoke-test.sh), [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) |
 | Container Reproducibility | Rebuilds `docker/build.Dockerfile` from scratch in CI | [docker/build.Dockerfile](../docker/build.Dockerfile) |
 | Automated PR Approval & Merge | Once ALL gates pass, approves and auto-merges verified feature & Dependabot PRs into `main` | [.github/workflows/auto-merge.yml](../.github/workflows/auto-merge.yml) |
 

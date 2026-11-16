@@ -64,6 +64,21 @@ TEST_CASE("config invalid TOML falls back to defaults") {
   CHECK_FALSE(res.config.general.offline_acknowledged);
   CHECK(res.config.present.mode == "game");
   CHECK_FALSE(res.warnings.empty());
+
+  // Malformed table header characters must return a parse error cleanly, never assert/abort.
+  const auto bad_hdr = sf::parse_config_toml("[%general]\noffline_acknowledged = true\n");
+  CHECK_FALSE(bad_hdr.parsed_ok);
+  CHECK_FALSE(bad_hdr.config.general.offline_acknowledged);
+
+  // Non-ASCII bytes (e.g. U+00C2) must fail cleanly without hitting upstream UTF-8 UB,
+  // while a leading UTF-8 BOM before valid ASCII TOML is tolerated.
+  const auto non_ascii = sf::parse_config_toml("[general]\noff\xC3\x82ne = true\n");
+  CHECK_FALSE(non_ascii.parsed_ok);
+  CHECK_FALSE(non_ascii.config.general.offline_acknowledged);
+
+  const auto bom_ok = sf::parse_config_toml("\xEF\xBB\xBF[present]\nmax_fps = 90\n");
+  CHECK(bom_ok.parsed_ok);
+  CHECK(bom_ok.config.present.max_fps == 90);
 }
 
 TEST_CASE("config handles adversarial types, negative bounds, null bytes, and large comments") {
@@ -112,6 +127,11 @@ TEST_CASE("config handles adversarial types, negative bounds, null bytes, and la
   CHECK_FALSE(nul_res.parsed_ok);
   CHECK_FALSE(nul_res.config.general.offline_acknowledged);
 
+  const std::string_view nul_header = "[general]\n[\0present]\n"sv;
+  const auto nul_header_res = sf::parse_config_toml(nul_header);
+  CHECK_FALSE(nul_header_res.parsed_ok);
+  CHECK_FALSE(nul_header_res.config.general.offline_acknowledged);
+
   // Empty and 64 KB comment/whitespace stress payloads remain valid and safe.
   const auto empty_res = sf::parse_config_toml("");
   CHECK(empty_res.parsed_ok);
@@ -130,4 +150,45 @@ TEST_CASE("config load_config_file handles missing path safely") {
   CHECK(missing.parsed_ok);
   CHECK_FALSE(missing.config.general.offline_acknowledged);
   CHECK_FALSE(missing.warnings.empty());
+}
+
+TEST_CASE("config validates [probe] settings and rejects unsafe output paths") {
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    probe_tracer = true
+
+    [probe]
+    capture_frames = 240
+    output_file = "ds3_trace.jsonl"
+    trace_resources = false
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.probe_tracer);
+  CHECK(valid.config.probe.capture_frames == 240);
+  CHECK(valid.config.probe.output_file == "ds3_trace.jsonl");
+  CHECK_FALSE(valid.config.probe.trace_resources);
+
+  const auto bad = sf::parse_config_toml(R"(
+    [probe]
+    capture_frames = 0
+    output_file = "../../etc/passwd"
+    trace_resources = "yes"
+    extra_key = 1
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.probe.capture_frames == 1);
+  CHECK(bad.config.probe.output_file == "soulsframe_capture.jsonl");
+  CHECK(bad.config.probe.trace_resources);
+  CHECK(bad.warnings.size() == 4);
+
+  const auto wrong_file_type = sf::parse_config_toml(R"(
+    [probe]
+    capture_frames = 999999
+    output_file = 123
+  )");
+  CHECK(wrong_file_type.parsed_ok);
+  CHECK(wrong_file_type.config.probe.capture_frames == 36000);
+  CHECK(wrong_file_type.config.probe.output_file == "soulsframe_capture.jsonl");
+  CHECK(wrong_file_type.warnings.size() == 2);
 }

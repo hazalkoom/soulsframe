@@ -124,7 +124,7 @@ JSON Lines (`*.jsonl`, one self-contained JSON object per line) lets Python (`pa
 
 ## 5. Planned implementation order
 
-1. **Step 1 (done):** Synchronous thread-safe `soulsframe.log` + rolling 120-frame summary (`avg_ms`, `avg_fps`, `p1_low_ms`, `spike_count`).
-2. **M2:** Async log/JSONL ring buffer + `ID3D11DeviceContext` draw-call counter + caller-RVA aggregator (`SF_PROBE`) + `tools/py/plot_frametimes.py`.
-3. **M3:** D3D11 timestamp queries per render pass (`gpu_timer`) + `session_header` metadata capture + A/B comparison script (`tools/py/compare_runs.py`).
+1. **M1 (done):** Synchronous thread-safe `soulsframe.log` + rolling 120-frame summary (`avg_ms`, `avg_fps`, `p1_low_ms`, `spike_count`).
+2. **M2 (done):** Pure `TraceRecorder` + `jsonl_writer` (`soulsframe_probe_core`), `ID3D11DeviceContext` vtable hooks (7 slots, `SF_PROBE` only), async writer `ProbeModule` outputting `session_header`/`resource`/`frame`/`gpu_pass`/`draw_site` JSONL lines, and `tools/py/analyze_capture.py` pass + call-site breakdown (verified end-to-end under Wine `--particles`).
+3. **M3 (next):** D3D11 timestamp queries per render pass (`gpu_timer`) + A/B comparison script (`tools/py/compare_runs.py`) + matplotlib plot helper.
 4. **M4+:** Remote inspector HTTP endpoint (`cpp-httplib`) serving live JSON snapshots and accepting runtime kill-switch toggles.

@@ -2,7 +2,7 @@
 
 Don't worry if you aren't a C++ or DirectX systems programmer. This guide gives you a fast orientation to what **SoulsFrame** is doing under the hood, why it is layered safely, and how to collaborate with AI coding agents on it.
 
-> Want to go deeper? Read [docs/10-deep-dive-for-learners-and-vibe-coders.md](10-deep-dive-for-learners-and-vibe-coders.md) for visual step-by-step explanations of DLL proxying, COM vtables, function hooking, harsh CI gates, contribution recipes, and career skill leverage.
+> Want to go deeper? Read [docs/10-deep-dive-for-learners-and-vibe-coders.md](10-deep-dive-for-learners-and-vibe-coders.md) for visual step-by-step explanations, or [docs/11-ai-agent-orchestration-opencode-agy.md](11-ai-agent-orchestration-opencode-agy.md) to orchestrate **OpenCode + Antigravity (AGY)** together safely.
 
 ## 1. What are we actually building?
 
@@ -65,7 +65,7 @@ Every AI agent automatically reads `AGENTS.md`, which teaches it our safety rule
 - *"Run `host-tests` and `scripts/ci/check-guards.sh` to verify nothing broke."*
 - *"Update `reports/` explaining what you changed in plain English."*
 
-Every pull request and push is protected by strict automated checks (`scripts/ci/check-guards.sh`, `clang-format`, `clang-tidy --warnings-as-errors`, `cppcheck`, CodeQL, `gitleaks`, `-Werror` unit tests with 605 assertions, and a 3-scenario Wine DirectX 11 test). Even if an experiment breaks something, CI catches it immediately before anything merges into `main`.
+Every pull request and push is protected by strict automated checks (`scripts/ci/check-guards.sh`, `clang-format`, `clang-tidy --warnings-as-errors`, `cppcheck`, CodeQL, `gitleaks`, `-Werror` unit tests with 681 assertions, 96%+ `gcovr` line coverage, `libFuzzer` fuzzers, and a 4-scenario Wine DirectX 11 test). Even if an experiment breaks something, CI catches it immediately before anything merges into `main`.
 
 ## 6. Things you should NOT ask an AI to put in Git
 
