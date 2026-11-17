@@ -12,24 +12,28 @@ benchmarks, `probe.gpu_timing` kill switch, and per-pass `gpu_ms` JSONL fields.
 ## Assignments completed (in order)
 
 ### 1. Python utilities — `feat(tools)`: add `tools/py/plot_gpu_passes.py`
+
 - Reads a SoulsFrame JSONL capture, parses `gpu_pass` records.
 - Aggregates total/average GPU ms per pass tag; emits Markdown/CSV tables;
   optional matplotlib bar chart via `--chart`.
 - Includes `--self-test` (verified passing).
 
 ### 2. Bash automation — `feat(scripts)`: add `scripts/quick-bench.sh`
+
 - Runs `host-bench` preset, builds benchmark harness, runs it to
   `build/host-bench/bench-results.json`, prints friendly colored summary
   (fastest/slowest with median/p95/ops-s, top-5 tables).
 - End-to-end verified successfully (12 benchmarks, all passed).
 
 ### 3. Human docs — `docs`: add GPU vs CPU timing to `docs/13-vibe-coder-cheatsheet.md`
+
 - Added "Understanding GPU vs CPU frame timing (`gpu_ms` vs `cpu_frame_ms`)"
   section explaining why a GPU pass taking 4ms differs from CPU stutter.
 - Documented `[probe] gpu_timing = true` kill switch.
 - Added GPU timing troubleshooting row; added `plot_gpu_passes.py` usage.
 
 ### 4. Edge-case tests — `test(timing)`: extend `tests/unit/test_gpu_timing.cpp`
+
 - Added extreme `gpu_ticks_to_ms` tests: 10 GHz frequencies, huge tick spans
   (0→UINT64_MAX staying finite/positive), near-max spans.
 - Added `GpuSlotRing` rapid stress wrap-around test (10,000 iterations with

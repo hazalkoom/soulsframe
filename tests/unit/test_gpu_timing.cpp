@@ -95,14 +95,14 @@ TEST_CASE("gpu_ticks_to_ms handles extreme frequencies and huge tick spans") {
   // 10 GHz, 10 second span -> 10,000,000,000 ticks -> 1000 ms.
   CHECK(gpu_ticks_to_ms(0, 10'000'000'000ULL, 10'000'000'000ULL, false) == doctest::Approx(1000.0));
   // Huge tick span at 10 GHz: 0 -> UINT64_MAX must stay finite and positive, not NaN/inf.
-  const double huge = gpu_ticks_to_ms(0, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL,
-                                      false);
+  const double huge =
+      gpu_ticks_to_ms(0, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL, false);
   CHECK(std::isfinite(huge));
   CHECK(huge > 0.0);
   CHECK(huge < 18446744073709551616.0); // finite (well below 2^64)
   // Near-maximum span must not overflow into NaN or negative values.
-  const double near_max = gpu_ticks_to_ms(1000, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL,
-                                        false);
+  const double near_max =
+      gpu_ticks_to_ms(1000, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL, false);
   CHECK(std::isfinite(near_max));
   CHECK(near_max > 0.0);
 }
