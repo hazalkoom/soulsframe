@@ -4,11 +4,13 @@
 
 #include <MinHook.h>
 #include <d3d11.h>
+#include <dxgi.h>
 #include <windows.h>
 
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 namespace sf::gfx {
 
@@ -63,6 +65,7 @@ ContextHookCallbacks g_callbacks{};
 std::atomic<bool> g_hooks_active{false};
 bool g_hooks_installed = false;
 bool g_owns_mh_init = false;
+std::unique_ptr<GpuTimer> g_gpu_timer;
 uintptr_t g_host_exe_base = 0;
 
 thread_local bool t_in_hook = false;
@@ -227,6 +230,14 @@ probe::DrawCallState capture_pipeline_state(ID3D11DeviceContext* ctx, probe::Dra
   return state;
 }
 
+/// Places a GPU timestamp when the last recorded call opened a new pass. Must run before the
+/// original D3D11 call so the stamp precedes that pass's GPU work.
+void maybe_stamp_gpu(ID3D11DeviceContext* ctx) {
+  if (g_gpu_timer && g_callbacks.pass_count) {
+    g_gpu_timer->on_pass_count(ctx, g_callbacks.pass_count(g_callbacks.user));
+  }
+}
+
 /// Emits a captured draw or dispatch call when active and on the immediate D3D11 context.
 void maybe_record_draw(ID3D11DeviceContext* ctx, probe::DrawApi api, uint32_t elem_count,
                        uint32_t instance_count, void* ret_addr) {
@@ -240,6 +251,7 @@ void maybe_record_draw(ID3D11DeviceContext* ctx, probe::DrawApi api, uint32_t el
   const probe::DrawCallState state =
       capture_pipeline_state(ctx, api, elem_count, instance_count, ret_addr);
   g_callbacks.on_draw(state, g_callbacks.user);
+  maybe_stamp_gpu(ctx);
 }
 
 /// Emits a `ClearRtv` or `ClearDsv` boundary event with the cleared view's resource digest.
@@ -261,6 +273,7 @@ void maybe_record_clear(ID3D11DeviceContext* ctx, probe::DrawApi api, ID3D11View
     inspect_view_resource(view, &state.rt_width, &state.rt_height);
   }
   g_callbacks.on_draw(state, g_callbacks.user);
+  maybe_stamp_gpu(ctx);
 }
 
 void STDMETHODCALLTYPE hooked_draw_indexed(ID3D11DeviceContext* ctx, UINT index_count,
@@ -411,10 +424,36 @@ bool install_context_hooks(const ContextHookCallbacks& callbacks) {
     slot.enabled = true;
   }
 
+  if (callbacks.gpu_timing && callbacks.pass_count) {
+    g_gpu_timer = std::make_unique<GpuTimer>();
+  }
+
   g_hooks_installed = true;
   g_hooks_active.store(true, std::memory_order_release);
-  SF_LOG("ID3D11DeviceContext hooks installed (7 slots)");
+  SF_LOG("ID3D11DeviceContext hooks installed (7 slots, gpu_timing=%s)",
+         g_gpu_timer ? "on" : "off");
   return true;
+}
+
+std::vector<GpuFrameResult> gpu_timing_present(void* swap_chain, uint64_t frame_index) {
+  if (!g_gpu_timer || !swap_chain) {
+    return {};
+  }
+  auto* sc = static_cast<IDXGISwapChain*>(swap_chain);
+  ID3D11Device* dev = nullptr;
+  if (FAILED(sc->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void**>(&dev))) || !dev) {
+    return {};
+  }
+  ID3D11DeviceContext* ctx = nullptr;
+  dev->GetImmediateContext(&ctx);
+  std::vector<GpuFrameResult> results;
+  if (ctx) {
+    g_gpu_timer->end_frame(ctx, frame_index);
+    results = g_gpu_timer->poll(ctx);
+    ctx->Release();
+  }
+  dev->Release();
+  return results;
 }
 
 void remove_context_hooks() {
@@ -423,6 +462,7 @@ void remove_context_hooks() {
     return;
   }
   rollback_slots();
+  g_gpu_timer.reset();
   g_hooks_installed = false;
   g_callbacks = {};
   SF_LOG("ID3D11DeviceContext hooks removed");

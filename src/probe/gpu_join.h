@@ -23,8 +23,9 @@ struct ReadyFrame {
 /// Pure C++ (no D3D11) so the delaying/ordering rules are unit-tested on Linux.
 class GpuFrameJoiner {
 public:
-  /// `max_hold_frames` bounds the delay: frames older than this are emitted without GPU data
-  /// (query lost, driver too slow, or timing disabled). Clamped to >= 1.
+  /// `max_hold_frames` bounds the delay (the probe uses 8, matching the 8 GPU query slots): frames
+  /// older than this are emitted without GPU data (query lost, driver too slow, or timing
+  /// disabled). Clamped to >= 1.
   explicit GpuFrameJoiner(size_t max_hold_frames = 4);
 
   /// Queues a completed frame snapshot (CPU side) awaiting GPU timing.

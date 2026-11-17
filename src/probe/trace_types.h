@@ -149,6 +149,10 @@ public:
   /// Resets both per-frame state and the session-wide seen-resource registry.
   void reset();
 
+  /// Number of GPU passes opened so far in the current frame. The D3D11 layer compares this
+  /// before/after each recorded draw to know when to place a GPU timestamp (one per pass).
+  uint32_t pass_count() const noexcept { return static_cast<uint32_t>(passes_.size()); }
+
 private:
   struct CallSiteKeyHash {
     size_t operator()(const CallSiteKey& k) const noexcept;

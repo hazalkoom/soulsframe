@@ -89,6 +89,7 @@ if(NOT SF_HOST_ONLY)
   if(SF_PROBE)
     target_sources(soulsframe PRIVATE
       src/gfx/d3d11/context_hook.cpp
+      src/gfx/d3d11/gpu_timer.cpp
       src/probe/probe_module.cpp
     )
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
