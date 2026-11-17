@@ -52,10 +52,12 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
-            src/timing/frame_stats.cpp
+            src/timing/frame_stats.cpp \
+            src/timing/gpu_timing.cpp
       - name: Run cppcheck strict static analysis
         run: |
           cppcheck \
@@ -77,10 +79,12 @@ jobs:
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/hooks/sigscan.cpp \
+            src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
-            src/timing/frame_stats.cpp
+            src/timing/frame_stats.cpp \
+            src/timing/gpu_timing.cpp
 
   host-tests:
     needs: guards

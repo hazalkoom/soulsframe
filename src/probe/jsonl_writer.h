@@ -23,9 +23,10 @@ std::string json_escape(std::string_view text);
 /// Serializes a `session_header` JSONL line (without trailing newline).
 std::string format_session_header(const SessionHeaderInfo& info);
 
-/// Serializes a per-frame summary (`type = "frame"`) JSONL line.
+/// Serializes a per-frame summary (`type = "frame"`) JSONL line. A non-negative `gpu_frame_ms`
+/// adds a trailing `"gpu_ms"` field (M3 GPU timestamp queries); negative omits it.
 std::string format_frame_event(uint64_t frame_idx, double cpu_frame_ms, uint32_t draw_calls,
-                               uint64_t total_elements);
+                               uint64_t total_elements, double gpu_frame_ms = -1.0);
 
 /// Serializes one `gpu_pass` boundary summary JSONL line.
 std::string format_pass_event(uint64_t frame_idx, const PassSummary& pass);

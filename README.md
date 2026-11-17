@@ -1,6 +1,6 @@
 # SoulsFrame: Dark Souls III performance and frame-pacing mod
 
-> Status: **M0–M2 implemented** (proxy + SwapChain timing + `sf-probe` v1 draw-call tracer + coverage & fuzz CI). Scope is **DS3 only**; Elden Ring comes later as a separate renderer backend (`docs/01`).
+> Status: **M0–M3 implemented** (proxy + SwapChain timing + `sf-probe` v1 draw-call tracer + GPU pass timing via D3D11 timestamp queries + Release micro-benchmarks + coverage & fuzz CI). Scope is **DS3 only**; Elden Ring comes later as a separate renderer backend (`docs/01`).
 > Dev host: Fedora Linux. Output: a Windows x64 `dinput8.dll` proxy mod, cross-compiled with MinGW-w64.
 
 ## What this is
