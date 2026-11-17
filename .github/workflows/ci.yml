@@ -101,6 +101,53 @@ jobs:
       - run: cmake --build --preset ${{ matrix.preset }}
       - run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
+  benchmarks:
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++
+      - name: Configure and build Release host-bench suite
+        run: |
+          cmake --preset host-bench -DSF_WERROR=ON
+          cmake --build --preset host-bench
+          ctest --preset host-bench --output-on-failure
+      - name: Execute Release micro-benchmarks
+        run: ./build/host-bench/tests/bench/soulsframe_benchmarks --json build/host-bench/bench-results.json
+      - name: Publish benchmark summary
+        run: |
+          python3 - <<'PY'
+          import json, os
+          data = json.load(open("build/host-bench/bench-results.json"))
+          rows = [
+              "## Performance Micro-Benchmarks (`host-bench` Release)",
+              "",
+              "| Benchmark | Category | Median (ns) | Min (ns) | P95 (ns) | Throughput |",
+              "|---|---|---:|---:|---:|---:|",
+          ]
+          for b in data["benchmarks"]:
+              if b["mb_per_sec"] > 0:
+                  tp = f"{b['mb_per_sec']:.1f} MB/s"
+              elif b["ops_per_sec"] >= 1e6:
+                  tp = f"{b['ops_per_sec'] / 1e6:.2f} Mops/s"
+              elif b["ops_per_sec"] >= 1e3:
+                  tp = f"{b['ops_per_sec'] / 1e3:.1f} Kops/s"
+              else:
+                  tp = f"{b['ops_per_sec']:.1f} ops/s"
+              rows.append(
+                  f"| `{b['name']}` | `{b['category']}` | {b['median_ns']:.2f} | "
+                  f"{b['min_ns']:.2f} | {b['p95_ns']:.2f} | {tp} |"
+              )
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(rows) + "\n")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-results
+          path: build/host-bench/bench-results.json
+
   coverage:
     needs: guards
     runs-on: ubuntu-latest
