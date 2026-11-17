@@ -31,12 +31,12 @@ jobs:
     needs: guards
     runs-on: ubuntu-latest
     outputs:
-      docs: ${{ steps.filter.outputs.docs }}
+      docs: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docs == 'true' }}
       cpp: ${{ steps.filter.outputs.cpp }}
       python: ${{ steps.filter.outputs.python }}
       automation: ${{ steps.filter.outputs.automation }}
-      workflow: ${{ steps.filter.outputs.workflow }}
-      heavy: ${{ steps.filter.outputs.cpp == 'true' || steps.filter.outputs.automation == 'true' || steps.filter.outputs.workflow == 'true' }}
+      workflow: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.workflow == 'true' }}
+      heavy: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.cpp == 'true' || steps.filter.outputs.automation == 'true' || steps.filter.outputs.workflow == 'true' }}
     steps:
       - uses: actions/checkout@v7
       - id: filter
