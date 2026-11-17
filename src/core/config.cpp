@@ -146,14 +146,16 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* prb = root["probe"].as_table()) {
-    constexpr std::array<std::string_view, 3> kProbeKeys = {"capture_frames", "output_file",
-                                                            "trace_resources"};
+    constexpr std::array<std::string_view, 4> kProbeKeys = {"capture_frames", "output_file",
+                                                            "trace_resources", "gpu_timing"};
     warn_unknown_keys(*prb, "probe.", kProbeKeys, out.warnings);
 
     read_clamped_u32(*prb, "capture_frames", "probe.capture_frames", 1U, 36000U,
                      out.config.probe.capture_frames, out.warnings);
     read_bool_key(*prb, "trace_resources", "probe.trace_resources",
                   out.config.probe.trace_resources, out.warnings);
+    read_bool_key(*prb, "gpu_timing", "probe.gpu_timing", out.config.probe.gpu_timing,
+                  out.warnings);
 
     if (auto v = (*prb)["output_file"].value<std::string>()) {
       if (v->empty() || v->find("..") != std::string::npos) {

@@ -23,3 +23,5 @@ probe_tracer = false
 capture_frames = 120
 output_file = "soulsframe_capture.jsonl"
 trace_resources = true
+# Measure GPU time per pass using D3D11 timestamp queries (adds gpu_ms to the capture).
+gpu_timing = true
