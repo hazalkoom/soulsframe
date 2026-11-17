@@ -3,6 +3,7 @@
 #include "timing/gpu_timing.h"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -85,4 +86,59 @@ TEST_CASE("GpuSlotRing ignores invalid operations safely") {
   REQUIRE(s.has_value());
   ring.release(*s); // abandoning a recording slot is allowed
   CHECK(ring.begin_frame().has_value());
+}
+
+TEST_CASE("gpu_ticks_to_ms handles extreme frequencies and huge tick spans") {
+  using sf::timing::gpu_ticks_to_ms;
+  // 10 GHz counter: 10,000 ticks == 1 microsecond == 0.001 ms.
+  CHECK(gpu_ticks_to_ms(0, 10'000, 10'000'000'000ULL, false) == doctest::Approx(0.001));
+  // 10 GHz, 10 second span -> 10,000,000,000 ticks -> 1000 ms.
+  CHECK(gpu_ticks_to_ms(0, 10'000'000'000ULL, 10'000'000'000ULL, false) == doctest::Approx(1000.0));
+  // Huge tick span at 10 GHz: 0 -> UINT64_MAX must stay finite and positive, not NaN/inf.
+  const double huge = gpu_ticks_to_ms(0, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL,
+                                      false);
+  CHECK(std::isfinite(huge));
+  CHECK(huge > 0.0);
+  CHECK(huge < 18446744073709551616.0); // finite (well below 2^64)
+  // Near-maximum span must not overflow into NaN or negative values.
+  const double near_max = gpu_ticks_to_ms(1000, std::numeric_limits<uint64_t>::max(), 10'000'000'000ULL,
+                                        false);
+  CHECK(std::isfinite(near_max));
+  CHECK(near_max > 0.0);
+}
+
+TEST_CASE("GpuSlotRing survives rapid stress wrap-around") {
+  sf::timing::GpuSlotRing ring(2);
+  for (uint64_t iter = 0; iter < 10'000; ++iter) {
+    // Phase 1: open two frames in flight.
+    const auto s0 = ring.begin_frame();
+    const auto s1 = ring.begin_frame();
+    if (!s0.has_value() || !s1.has_value()) {
+      break; // capacity allows two frames; a break here would be a bug we should catch below
+    }
+    const uint64_t f0 = 10'000 + iter;
+    const uint64_t f1 = 20'000 + iter;
+    ring.submit_frame(*s0, f0);
+    CHECK(ring.pending_count() == 1);
+    CHECK(ring.frame_of(*s0) == f0);
+    CHECK(ring.oldest_pending().has_value());
+    CHECK(*ring.oldest_pending() == *s0);
+
+    ring.submit_frame(*s1, f1);
+    CHECK(ring.pending_count() == 2);
+    CHECK(ring.frame_of(*s1) == f1);
+
+    // Phase 2: release both, verifying FIFO bookkeeping resets cleanly.
+    ring.release(*s0);
+    CHECK(ring.pending_count() == 1);
+    CHECK(ring.oldest_pending().has_value());
+    CHECK(*ring.oldest_pending() == *s1);
+    ring.release(*s1);
+    CHECK(ring.pending_count() == 0);
+    CHECK(!ring.oldest_pending().has_value());
+  }
+  // Ring must still be usable after the stress loop.
+  const auto final_slot = ring.begin_frame();
+  CHECK(final_slot.has_value());
+  ring.release(*final_slot);
 }
