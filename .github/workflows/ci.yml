@@ -55,7 +55,8 @@ jobs:
             src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
-            src/timing/frame_stats.cpp
+            src/timing/frame_stats.cpp \
+            src/timing/gpu_timing.cpp
       - name: Run cppcheck strict static analysis
         run: |
           cppcheck \
@@ -80,7 +81,8 @@ jobs:
             src/probe/jsonl_writer.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
-            src/timing/frame_stats.cpp
+            src/timing/frame_stats.cpp \
+            src/timing/gpu_timing.cpp
 
   host-tests:
     needs: guards

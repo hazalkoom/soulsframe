@@ -39,6 +39,8 @@ pure_files=(
   src/tex/content_hash.cpp
   src/timing/frame_stats.h
   src/timing/frame_stats.cpp
+  src/timing/gpu_timing.h
+  src/timing/gpu_timing.cpp
 )
 
 for f in "${pure_files[@]}"; do

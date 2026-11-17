@@ -30,6 +30,7 @@ add_library(soulsframe_core STATIC
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
   src/timing/frame_stats.cpp
+  src/timing/gpu_timing.cpp
 )
 target_include_directories(soulsframe_core PUBLIC src)
 target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})

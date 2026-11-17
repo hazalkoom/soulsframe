@@ -2,6 +2,7 @@ add_executable(soulsframe_unit_tests
   test_config.cpp
   test_content_hash.cpp
   test_frame_stats.cpp
+  test_gpu_timing.cpp
   test_jsonl_writer.cpp
   test_module_registry.cpp
   test_offline_guard.cpp
