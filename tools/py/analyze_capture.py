@@ -75,7 +75,8 @@ def analyze_jsonl_capture(path: Path, spike_threshold_ms: float = 25.0) -> dict[
     total_draw_calls = 0
     pass_count = 0
     draw_sites = 0
-    pass_breakdown: dict[str, dict[str, int]] = {}
+    pass_breakdown: dict[str, dict[str, Any]] = {}
+    gpu_frame_times: list[float] = []
     site_agg: dict[tuple[str, str, str, bool], dict[str, Any]] = {}
     resources: list[dict[str, Any]] = []
 
@@ -94,6 +95,9 @@ def analyze_jsonl_capture(path: Path, spike_threshold_ms: float = 25.0) -> dict[
                 cpu_ms = event.get("cpu_frame_ms")
                 if isinstance(cpu_ms, (int, float)):
                     frame_times.append(float(cpu_ms))
+                gpu_ms = event.get("gpu_ms")  # present only when M3 GPU timing resolved
+                if isinstance(gpu_ms, (int, float)):
+                    gpu_frame_times.append(float(gpu_ms))
                 draws = event.get("draw_calls")
                 if isinstance(draws, int):
                     total_draw_calls += draws
@@ -103,6 +107,10 @@ def analyze_jsonl_capture(path: Path, spike_threshold_ms: float = 25.0) -> dict[
                 entry = pass_breakdown.setdefault(tag, {"events": 0, "draws": 0})
                 entry["events"] += 1
                 entry["draws"] += int(event.get("draws", 0) or 0)
+                pass_gpu = event.get("gpu_ms")
+                if isinstance(pass_gpu, (int, float)):
+                    entry["gpu_ms_total"] = round(entry.get("gpu_ms_total", 0.0) + float(pass_gpu), 4)
+                    entry["gpu_samples"] = entry.get("gpu_samples", 0) + 1
             elif event_type == "draw_site":
                 draw_sites += 1
                 rva = str(event.get("rva", "0x0"))
@@ -132,6 +140,7 @@ def analyze_jsonl_capture(path: Path, spike_threshold_ms: float = 25.0) -> dict[
         "header": header,
         "frames": summarize_frame_times(frame_times, spike_threshold_ms) if frame_times else None,
         "total_draw_calls": total_draw_calls,
+        "gpu_frames": summarize_frame_times(gpu_frame_times, spike_threshold_ms) if gpu_frame_times else None,
         "gpu_pass_events": pass_count,
         "pass_breakdown": pass_breakdown,
         "draw_site_events": draw_sites,
@@ -179,8 +188,8 @@ def run_self_test() -> int:
                     json.dumps({"type": "session_header", "schema": 1, "game": "ds3"}),
                     json.dumps({"type": "resource", "frame_idx": 1, "id": "0x1234", "kind": "Texture2D", "rt": True}),
                     json.dumps({"type": "frame", "idx": 1, "cpu_frame_ms": 16.6, "draw_calls": 10}),
-                    json.dumps({"type": "frame", "idx": 2, "cpu_frame_ms": 28.0, "draw_calls": 25}),
-                    json.dumps({"type": "gpu_pass", "frame_idx": 2, "pass_id": 1, "tag": "particles_alpha", "draws": 20}),
+                    json.dumps({"type": "frame", "idx": 2, "cpu_frame_ms": 28.0, "draw_calls": 25, "gpu_ms": 9.5}),
+                    json.dumps({"type": "gpu_pass", "frame_idx": 2, "pass_id": 1, "tag": "particles_alpha", "draws": 20, "gpu_ms": 4.25}),
                     json.dumps({"type": "draw_site", "frame_idx": 2, "rva": "0x1a00", "api": "DrawIndexed", "ps_hash": "0xaa", "blend_enabled": True, "count": 20, "elements": 600}),
                 ]
             )
@@ -193,6 +202,8 @@ def run_self_test() -> int:
         assert parsed["total_draw_calls"] == 35
         assert parsed["gpu_pass_events"] == 1
         assert parsed["pass_breakdown"]["particles_alpha"]["draws"] == 20
+        assert parsed["pass_breakdown"]["particles_alpha"]["gpu_ms_total"] == 4.25
+        assert parsed["gpu_frames"] is not None and parsed["gpu_frames"]["count"] == 1
         assert parsed["top_draw_sites"][0]["rva"] == "0x1a00"
         assert parsed["resource_count"] == 1
 
