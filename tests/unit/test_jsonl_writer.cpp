@@ -58,3 +58,36 @@ TEST_CASE("JSONL event formatters produce valid structured lines") {
   CHECK(lines[3].find(R"("type":"draw_site")") != std::string::npos);
   CHECK(lines[3].find(R"("rva":"0x1a2b3c")") != std::string::npos);
 }
+
+TEST_CASE("gpu_ms is appended only when measured (schema backward compatible)") {
+  using namespace sf::probe;
+
+  // Unmeasured: output has no gpu_ms key at all and still ends with a closing brace.
+  const auto plain = format_frame_event(3, 16.6, 10, 500);
+  CHECK(plain.find("gpu_ms") == std::string::npos);
+  CHECK(plain.back() == '}');
+
+  // Measured: key appended as the last field, line stays a single valid-looking object.
+  const auto timed = format_frame_event(3, 16.6, 10, 500, 7.25);
+  CHECK(timed.find(R"("elements":500,"gpu_ms":7.2500})") != std::string::npos);
+
+  PassSummary pass;
+  pass.pass_id = 2;
+  CHECK(format_pass_event(3, pass).find("gpu_ms") == std::string::npos);
+  pass.gpu_ms = 1.5;
+  const auto pass_line = format_pass_event(3, pass);
+  CHECK(pass_line.find(R"("gpu_ms":1.5000})") != std::string::npos);
+  CHECK(pass_line.back() == '}');
+
+  // Zero is a legitimate measurement and must be emitted.
+  pass.gpu_ms = 0.0;
+  CHECK(format_pass_event(3, pass).find(R"("gpu_ms":0.0000})") != std::string::npos);
+
+  // Snapshot propagation: frame-level GPU time reaches the serialized frame line.
+  FrameTraceSnapshot snap;
+  snap.frame_index = 9;
+  snap.gpu_frame_ms = 4.0;
+  const auto lines = serialize_frame_snapshot(snap, 16.0);
+  REQUIRE(lines.size() == 1);
+  CHECK(lines[0].find(R"("gpu_ms":4.0000})") != std::string::npos);
+}

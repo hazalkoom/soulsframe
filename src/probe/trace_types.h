@@ -90,6 +90,7 @@ struct PassSummary {
   bool blend_enabled = false;
   bool depth_write = true;
   bool has_dispatch = false;
+  double gpu_ms = -1.0; ///< Measured GPU time for this pass; negative means "not measured".
 };
 
 /// Metadata describing an observed GPU resource (render target, texture, or buffer).
@@ -113,6 +114,7 @@ struct FrameTraceSnapshot {
   std::vector<PassSummary> passes;
   std::vector<CallSiteStats> call_sites;
   std::vector<ResourceSummary> new_resources;
+  double gpu_frame_ms = -1.0; ///< Measured GPU time for the whole frame; negative = unmeasured.
 };
 
 /// Classifies a completed pass using render-target count, blend, depth-write, and dispatch cues.
