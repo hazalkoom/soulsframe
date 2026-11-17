@@ -7,6 +7,7 @@ add_executable(soulsframe_unit_tests
   test_offline_guard.cpp
   test_probe_trace.cpp
   test_profile.cpp
+  test_security_inputs.cpp
   test_sha256.cpp
   test_sigscan.cpp
 )
