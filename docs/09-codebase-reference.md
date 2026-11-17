@@ -67,7 +67,7 @@ flowchart TD
 
 | File | Layer | Purpose |
 |---|---|---|
-| [tests/unit/](../tests/unit/) | L1 (Linux native) | 10 `doctest` suites (29 test cases, 681 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) with `SF_WERROR=ON`. |
+| [tests/unit/](../tests/unit/) | L1 (Linux native) | 11 `doctest` suites (38 test cases, 787 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) and adversarial inputs with `SF_WERROR=ON`. |
 | [tests/bench/](../tests/bench/) | L1 (Linux Release) | Micro-benchmark harness and 12 Release `-O3` benchmarks (`soulsframe_benchmarks`) measuring `FrameStats`, `TraceRecorder`, `jsonl_writer`, `XXH64`, `SHA-256`, `sigscan`, and `parse_config_toml` with `--json` artifact export. |
 | [tests/fuzz/](../tests/fuzz/) | L2 (Linux libFuzzer + ASan/UBSan) | 3 libFuzzer targets (`fuzz_config`, `fuzz_sigscan`, `fuzz_probe_jsonl`) and seed corpora exercised on every CI run. |
 | [scripts/ci/run-coverage.sh](../scripts/ci/run-coverage.sh) | L1 (Linux `gcovr`) | Configures `host-cov`, runs `ctest`, generates HTML/XML/JSON reports, and enforces `SF_MIN_LINE_COVERAGE=90`. |
