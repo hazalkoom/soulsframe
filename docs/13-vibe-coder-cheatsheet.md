@@ -39,6 +39,10 @@ podman run --rm --userns=keep-id -v "$PWD:/src:Z" -v sf-ccache:/ccache -w /src s
 
 # 4-scenario Wine smoke test
 just smoke
+
+# Plot GPU pass timings from a JSONL capture (requires matplotlib for --chart)
+python3 tools/py/plot_gpu_passes.py build/host-bench/bench-results.json --markdown /tmp/gpu_summary.md
+python3 tools/py/plot_gpu_passes.py <capture.jsonl> --csv /tmp/gpu_summary.csv --chart /tmp/gpu.png
 ```
 
 ## 3. Settings (`soulsframe.toml`) — plain English
@@ -72,6 +76,9 @@ probe_tracer = false
 capture_frames = 120
 output_file = "soulsframe_capture.jsonl"
 trace_resources = true
+# Measure per-pass and per-frame GPU time via D3D11 timestamp queries (M3). Kill switch: set false
+# if a driver misbehaves with queries; capture then omits `gpu_ms` fields.
+gpu_timing = true
 ```
 
 Safety-critical defaults:
@@ -80,7 +87,28 @@ Safety-critical defaults:
   yourself, and only when you are playing offline.
 - `mod_enabled = false` turns the entire mod off without deleting anything.
 
-## 4. Safety rules (never break these)
+## 4. Understanding GPU vs CPU frame timing (`gpu_ms` vs `cpu_frame_ms`)
+
+SoulsFrame can now measure both **how much time the GPU spent drawing** each frame and **how long
+the game took** to produce the frame. The two numbers answer different questions:
+
+- **`cpu_frame_ms`** (frame-level): How long the game CPU spent on the frame. Slow here usually means
+  stutters, hitches, physics/frame-rate work, or waiting on the GPU.
+- **`gpu_ms`** (per-pass / per-frame): How long the GPU actually spent in each render pass
+  (`particles_alpha`, `gbuffer`, `shadow`, `postprocess`, ...). Slow here usually means real work
+  needed: overdraw, heavy shaders, too many draw calls.
+
+**Why a GPU pass taking 4ms is not the same as CPU stutter.** The CPU and GPU are different pipes.
+If a pass takes 4ms of GPU time, the GPU is busy — the frame will take at least 4ms to display. That
+is a *pipeline cost*, not necessarily a *stutter*. CPU stutter (high `cpu_frame_ms`) means the CPU
+spun its wheels: the GPU was waiting, or the game logic hitched. A vibe-coder friendly way to think:
+GPU time is "how hard is the painting"; CPU time is "how hard is the thinking". Both matter, but
+they need different fixes (fewer draws / cheaper shaders vs. smoothing the CPU timeline).
+
+The GPU numbers are attached with a small delay (GPU results arrive 1–3 frames after the frame is
+recorded). Frames whose GPU answer hasn't arrived yet are held briefly, then written without `gpu_ms`.
+
+## 5. Safety rules (never break these)
 
 1. **Offline only.** Never set `offline_acknowledged = true` while connected to an online session.
    The guard also refuses hooks if it sees `--online` flags or online session markers.
@@ -90,7 +118,7 @@ Safety-critical defaults:
    the mod logs it and keeps the game running.
 4. **Measure first.** No optimization lands without a before/after frame-time capture in `bench/`.
 
-## 5. How to add or change something
+## 6. How to add or change something
 
 Ask your AI coding agent with prompts like these:
 
@@ -101,7 +129,7 @@ Ask your AI coding agent with prompts like these:
 
 Always run the guard script and the host tests before committing. Format C++ with `clang-format -i`.
 
-## 6. Where to look when something breaks
+## 7. Where to look when something breaks
 
 | Symptom | First place to check |
 |---------|----------------------|
@@ -110,9 +138,10 @@ Always run the guard script and the host tests before committing. Format C++ wit
 | Unit test fails on Linux | `tests/unit/` — run `ctest --preset host-tests` to see which |
 | JSONL capture looks wrong | `src/probe/jsonl_writer.cpp` and `tests/unit/test_jsonl_writer.cpp` |
 | Frame-time math off | `src/timing/frame_stats.cpp` and `tests/unit/test_frame_stats.cpp` |
+| GPU pass timing missing | `src/gfx/d3d11/gpu_timer.*` (D3D11) and `src/timing/gpu_timing.*` / `src/probe/gpu_join.*` (pure) |
 | Config rejected | `src/core/config.cpp` and `tests/unit/test_config.cpp` |
 
-## 7. Related docs (deeper reading)
+## 8. Related docs (deeper reading)
 
 - `docs/guide-for-vibe-coders.md` — full plain-English tour (start here if you are new)
 - `docs/10-deep-dive-for-learners-and-vibe-coders.md` — zero-to-systems masterclass
