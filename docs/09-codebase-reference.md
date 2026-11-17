@@ -26,13 +26,13 @@ flowchart TD
 
 | File | Purpose |
 |---|---|
-| [CMakeLists.txt](../CMakeLists.txt) | Root build graph: builds pure static libraries `soulsframe_core` and `soulsframe_probe_core`, plus either Windows `dinput8.dll` + `d3d11_testbed.exe` or native Linux `soulsframe_unit_tests`. |
-| [CMakePresets.json](../CMakePresets.json) | Named configurations: `win64-release`, `win64-probe`, `host-tests`, `host-asan`, `host-cov`. |
+| [CMakeLists.txt](../CMakeLists.txt) | Root build graph: builds pure static libraries `soulsframe_core` and `soulsframe_probe_core`, plus either Windows `dinput8.dll` + `d3d11_testbed.exe` or native Linux `soulsframe_unit_tests` and `soulsframe_benchmarks`. |
+| [CMakePresets.json](../CMakePresets.json) | Named configurations: `win64-release`, `win64-probe`, `host-tests`, `host-asan`, `host-cov`, `host-bench`. |
 | [cmake/deps.cmake](../cmake/deps.cmake) | Pinned `FetchContent` dependencies (`tomlplusplus` v3.4.0, `xxHash` v0.8.4, `MinHook` v1.3.4, `doctest` v2.5.3) with `BUILD_SHARED_LIBS=OFF`. |
 | [cmake/toolchains/mingw-w64-x86_64.cmake](../cmake/toolchains/mingw-w64-x86_64.cmake) | Cross-compile toolchain supporting both Fedora and Debian/Ubuntu MinGW sysroot layouts. |
 | [docker/build.Dockerfile](../docker/build.Dockerfile) | Reproducible Fedora 43 MinGW-w64 + CMake + Ninja + ccache + clang-tools container (`sf-build`). |
 | [docker/wine-test.Dockerfile](../docker/wine-test.Dockerfile) | Headless Fedora 43 + Wine + Xvfb + Mesa container (`sf-wine-test`). |
-| [justfile](../justfile) | Task runner shortcuts (`img-build`, `build`, `probe`, `test-host`, `test-cov`, `smoke`, `deploy`). |
+| [justfile](../justfile) | Task runner shortcuts (`img-build`, `build`, `probe`, `test-host`, `test-cov`, `bench`, `smoke`, `deploy`). |
 | [config/soulsframe.toml.example](../config/soulsframe.toml.example) | Default documented configuration template shipped to users (including `[probe]` settings). |
 
 ## 3. Pure C++ modules (Linux-testable, no Win32/D3D11)
@@ -68,6 +68,7 @@ flowchart TD
 | File | Layer | Purpose |
 |---|---|---|
 | [tests/unit/](../tests/unit/) | L1 (Linux native) | 10 `doctest` suites (29 test cases, 681 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) with `SF_WERROR=ON`. |
+| [tests/bench/](../tests/bench/) | L1 (Linux Release) | Micro-benchmark harness and 12 Release `-O3` benchmarks (`soulsframe_benchmarks`) measuring `FrameStats`, `TraceRecorder`, `jsonl_writer`, `XXH64`, `SHA-256`, `sigscan`, and `parse_config_toml` with `--json` artifact export. |
 | [tests/fuzz/](../tests/fuzz/) | L2 (Linux libFuzzer + ASan/UBSan) | 3 libFuzzer targets (`fuzz_config`, `fuzz_sigscan`, `fuzz_probe_jsonl`) and seed corpora exercised on every CI run. |
 | [scripts/ci/run-coverage.sh](../scripts/ci/run-coverage.sh) | L1 (Linux `gcovr`) | Configures `host-cov`, runs `ctest`, generates HTML/XML/JSON reports, and enforces `SF_MIN_LINE_COVERAGE=90`. |
 | [tests/testbed/d3d11_testbed.cpp](../tests/testbed/d3d11_testbed.cpp) | L4/L5 (Wine/Windows) | Minimal D3D11 window that loads `dinput8.dll`, renders frames, and supports `--resize`, `--msaa 4`, and `--particles` (HLSL VS+PS + instanced alpha-blended draws). |
