@@ -23,7 +23,8 @@ std::string huge_toml(size_t count) {
   }
   out += "[present]\nmode = \"game\"\nmax_fps = 60\n";
   out += "[modules]\nframe_telemetry = true\npresentation = false\nprobe_tracer = false\n";
-  out += "[probe]\ncapture_frames = 120\noutput_file = \"soulsframe_capture.jsonl\"\ntrace_resources = true\n";
+  out += "[probe]\ncapture_frames = 120\noutput_file = "
+         "\"soulsframe_capture.jsonl\"\ntrace_resources = true\n";
   return out;
 }
 
@@ -110,7 +111,8 @@ TEST_CASE("security: malformed TOML semantic edge cases fall back to safe defaul
   CHECK(wrong.config.probe.capture_frames <= 36000U);
 
   // Duplicate keys are rejected by toml++ as a hard parse error (safe).
-  const auto dup = sf::parse_config_toml("[general]\noffline_acknowledged = false\noffline_acknowledged = true\n");
+  const auto dup = sf::parse_config_toml(
+      "[general]\noffline_acknowledged = false\noffline_acknowledged = true\n");
   CHECK_FALSE(dup.parsed_ok);
   CHECK_FALSE(dup.config.general.offline_acknowledged);
 }
@@ -150,7 +152,8 @@ TEST_CASE("security: path traversal and unsafe output_file values are rejected")
   CHECK_FALSE(t1.warnings.empty());
 
   // Windows-style backslash traversal: rejected via warning, falls back to safe default.
-  const auto t2 = sf::parse_config_toml("[probe]\noutput_file = \"..\\\\..\\\\windows\\\\win.ini\"\n");
+  const auto t2 =
+      sf::parse_config_toml("[probe]\noutput_file = \"..\\\\..\\\\windows\\\\win.ini\"\n");
   CHECK(t2.parsed_ok);
   CHECK(t2.config.probe.output_file == "soulsframe_capture.jsonl");
   CHECK_FALSE(t2.warnings.empty());
@@ -162,7 +165,8 @@ TEST_CASE("security: path traversal and unsafe output_file values are rejected")
   CHECK_FALSE(t3.warnings.empty());
 
   // Absolute path (starts with /) - not a traversal per the ".." check, accepted as-is.
-  const auto t4 = sf::parse_config_toml("[probe]\noutput_file = \"/tmp/soulsframe_capture.jsonl\"\n");
+  const auto t4 =
+      sf::parse_config_toml("[probe]\noutput_file = \"/tmp/soulsframe_capture.jsonl\"\n");
   CHECK(t4.parsed_ok);
   CHECK(t4.config.probe.output_file == "/tmp/soulsframe_capture.jsonl");
 
@@ -200,16 +204,16 @@ TEST_CASE("security: json_escape handles adversarial input without corrupting ou
   }
   const auto esc_ctrl = json_escape(all_ctrl);
   // Each control byte becomes an escape starting with backslash; verify known mappings.
-  CHECK(esc_ctrl.find("\\u0000") != std::string::npos);   // NUL
-  CHECK(esc_ctrl.find("\\u0001") != std::string::npos);   // SOH
-  CHECK(esc_ctrl.find("\\b") != std::string::npos);       // backspace (0x08)
-  CHECK(esc_ctrl.find("\\u000b") != std::string::npos);   // VT (0x0b)
-  CHECK(esc_ctrl.find("\\f") != std::string::npos);       // form feed (0x0c)
-  CHECK(esc_ctrl.find("\\u000e") != std::string::npos);   // SO (0x0e)
-  CHECK(esc_ctrl.find("\\n") != std::string::npos);       // newline (0x0a)
-  CHECK(esc_ctrl.find("\\r") != std::string::npos);       // carriage return (0x0d)
-  CHECK(esc_ctrl.find("\\t") != std::string::npos);       // tab (0x09)
-  CHECK(esc_ctrl.find("\\u001f") != std::string::npos);   // US (0x1f)
+  CHECK(esc_ctrl.find("\\u0000") != std::string::npos); // NUL
+  CHECK(esc_ctrl.find("\\u0001") != std::string::npos); // SOH
+  CHECK(esc_ctrl.find("\\b") != std::string::npos);     // backspace (0x08)
+  CHECK(esc_ctrl.find("\\u000b") != std::string::npos); // VT (0x0b)
+  CHECK(esc_ctrl.find("\\f") != std::string::npos);     // form feed (0x0c)
+  CHECK(esc_ctrl.find("\\u000e") != std::string::npos); // SO (0x0e)
+  CHECK(esc_ctrl.find("\\n") != std::string::npos);     // newline (0x0a)
+  CHECK(esc_ctrl.find("\\r") != std::string::npos);     // carriage return (0x0d)
+  CHECK(esc_ctrl.find("\\t") != std::string::npos);     // tab (0x09)
+  CHECK(esc_ctrl.find("\\u001f") != std::string::npos); // US (0x1f)
 
   // Huge input string must not crash or lose data.
   std::string huge(1000000, 'z');
@@ -226,16 +230,16 @@ TEST_CASE("security: json_escape handles adversarial input without corrupting ou
   mix_input += " to ";
   mix_input.push_back('\\');
   mix_input.push_back('n');
-  mix_input.push_back('\n');  // actual newline
-  mix_input.push_back('\t');  // actual tab
+  mix_input.push_back('\n');   // actual newline
+  mix_input.push_back('\t');   // actual tab
   mix_input.push_back('\x01'); // actual SOH control char
   mix_input += " world";
   const auto esc_mix = json_escape(mix_input);
-  CHECK(esc_mix.find(R"(\")") != std::string::npos);    // escaped quote
-  CHECK(esc_mix.find(R"(\\)") != std::string::npos);    // escaped backslash
-  CHECK(esc_mix.find("\\n") != std::string::npos);      // escaped newline
-  CHECK(esc_mix.find("\\t") != std::string::npos);      // escaped tab
-  CHECK(esc_mix.find("\\u0001") != std::string::npos);  // escaped SOH
+  CHECK(esc_mix.find(R"(\")") != std::string::npos);   // escaped quote
+  CHECK(esc_mix.find(R"(\\)") != std::string::npos);   // escaped backslash
+  CHECK(esc_mix.find("\\n") != std::string::npos);     // escaped newline
+  CHECK(esc_mix.find("\\t") != std::string::npos);     // escaped tab
+  CHECK(esc_mix.find("\\u0001") != std::string::npos); // escaped SOH
 }
 
 TEST_CASE("security: JSONL formatters tolerate extreme numeric values without UB") {
@@ -330,16 +334,19 @@ TEST_CASE("security: serialize_frame_snapshot handles empty and oversized snapsh
   full.call_sites.reserve(3);
   full.new_resources.reserve(3);
 
-  PassSummary pass{.pass_id = 1, .tag = PassTag::ParticlesAlpha, .draw_calls = 10,
-                   .total_elements = 1000};
+  PassSummary pass{
+      .pass_id = 1, .tag = PassTag::ParticlesAlpha, .draw_calls = 10, .total_elements = 1000};
   full.passes.push_back(pass);
 
-  CallSiteStats site{.caller_rva = 0x1234ULL, .api = DrawApi::DrawIndexed,
-                     .draw_count = 5, .total_elements = 500};
+  CallSiteStats site{
+      .caller_rva = 0x1234ULL, .api = DrawApi::DrawIndexed, .draw_count = 5, .total_elements = 500};
   full.call_sites.push_back(site);
 
-  ResourceSummary res{.kind = "Texture2D", .id_hash = 0xdeadbeefULL,
-                      .width = 1920, .height = 1080, .is_render_target = true};
+  ResourceSummary res{.kind = "Texture2D",
+                      .id_hash = 0xdeadbeefULL,
+                      .width = 1920,
+                      .height = 1080,
+                      .is_render_target = true};
   full.new_resources.push_back(res);
 
   const auto full_lines = serialize_frame_snapshot(full, 33.3);
@@ -355,8 +362,7 @@ TEST_CASE("security: offline guard spoofing attempts are all blocked") {
   {
     sf::OfflineCheckInput in;
     in.config_offline_acknowledged = true;
-    in.command_line_args = {"DarkSoulsIII.exe", "-windowed", "-dx11", "-fullscreen",
-                            "--Online"};
+    in.command_line_args = {"DarkSoulsIII.exe", "-windowed", "-dx11", "-fullscreen", "--Online"};
     const auto v = sf::evaluate_offline_guard(in);
     CHECK_FALSE(v.allowed);
     CHECK_FALSE(v.reason.empty());
@@ -402,8 +408,8 @@ TEST_CASE("security: offline guard spoofing attempts are all blocked") {
   {
     sf::OfflineCheckInput in;
     in.config_offline_acknowledged = true;
-    in.command_line_args = {"DarkSoulsIII.exe", "--online-extra", "-onlines", "online",
-                            "ONLINE ", "--force-onlinex"};
+    in.command_line_args = {"DarkSoulsIII.exe", "--online-extra", "-onlines",
+                            "online",           "ONLINE ",        "--force-onlinex"};
     const auto v = sf::evaluate_offline_guard(in);
     CHECK(v.allowed);
   }
@@ -438,8 +444,8 @@ TEST_CASE("security: offline guard spoofing attempts are all blocked") {
 
 TEST_CASE("security: load_config_file handles unreadable and dangerous paths safely") {
   // Missing file -> defaults + warning, no throw.
-  const auto missing = sf::load_config_file(
-      "/nonexistent/soulsframe_missing_security_987654321.toml");
+  const auto missing =
+      sf::load_config_file("/nonexistent/soulsframe_missing_security_987654321.toml");
   CHECK(missing.parsed_ok);
   CHECK_FALSE(missing.config.general.offline_acknowledged);
   CHECK_FALSE(missing.warnings.empty());

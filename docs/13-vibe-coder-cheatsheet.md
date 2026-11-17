@@ -75,6 +75,7 @@ trace_resources = true
 ```
 
 Safety-critical defaults:
+
 - `offline_acknowledged = false` means **no hooks are installed**. You must flip it to `true`
   yourself, and only when you are playing offline.
 - `mod_enabled = false` turns the entire mod off without deleting anything.
