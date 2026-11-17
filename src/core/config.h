@@ -51,6 +51,10 @@ struct Config {
 
     /// Record unique active D3D11 textures/render-targets alongside draw sites.
     bool trace_resources = true;
+
+    /// Measure per-pass and per-frame GPU time with D3D11 timestamp queries (M3). Kill switch:
+    /// set false if a driver misbehaves with queries; capture then omits `gpu_ms` fields.
+    bool gpu_timing = true;
   } probe;
 
   /// Returns a `Config` populated with safe, conservative defaults.

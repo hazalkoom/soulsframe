@@ -90,6 +90,7 @@ struct PassSummary {
   bool blend_enabled = false;
   bool depth_write = true;
   bool has_dispatch = false;
+  double gpu_ms = -1.0; ///< Measured GPU time for this pass; negative means "not measured".
 };
 
 /// Metadata describing an observed GPU resource (render target, texture, or buffer).
@@ -113,6 +114,7 @@ struct FrameTraceSnapshot {
   std::vector<PassSummary> passes;
   std::vector<CallSiteStats> call_sites;
   std::vector<ResourceSummary> new_resources;
+  double gpu_frame_ms = -1.0; ///< Measured GPU time for the whole frame; negative = unmeasured.
 };
 
 /// Classifies a completed pass using render-target count, blend, depth-write, and dispatch cues.
@@ -146,6 +148,10 @@ public:
 
   /// Resets both per-frame state and the session-wide seen-resource registry.
   void reset();
+
+  /// Number of GPU passes opened so far in the current frame. The D3D11 layer compares this
+  /// before/after each recorded draw to know when to place a GPU timestamp (one per pass).
+  uint32_t pass_count() const noexcept { return static_cast<uint32_t>(passes_.size()); }
 
 private:
   struct CallSiteKeyHash {

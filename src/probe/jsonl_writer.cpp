@@ -16,6 +16,19 @@ std::string format_hex64(uint64_t value) {
   return {buf.data()};
 }
 
+/// Appends `,"gpu_ms":<v>` before the closing brace of a one-line JSON object when `gpu_ms` is
+/// non-negative. Why: schema stays backward compatible - captures without GPU timing are
+/// byte-identical to the pre-M3 format.
+void append_gpu_ms(std::string& json, double gpu_ms) {
+  if (gpu_ms < 0.0 || json.empty() || json.back() != '}') {
+    return;
+  }
+  std::array<char, 40> buf{};
+  std::snprintf(buf.data(), buf.size(), ",\"gpu_ms\":%.4f}", gpu_ms);
+  json.pop_back();
+  json += buf.data();
+}
+
 } // namespace
 
 std::string json_escape(std::string_view text) {
@@ -74,19 +87,21 @@ std::string format_session_header(const SessionHeaderInfo& info) {
 }
 
 std::string format_frame_event(uint64_t frame_idx, double cpu_frame_ms, uint32_t draw_calls,
-                               uint64_t total_elements) {
+                               uint64_t total_elements, double gpu_frame_ms) {
   std::array<char, 160> buf{};
   std::snprintf(
       buf.data(), buf.size(),
       R"({"type":"frame","idx":%llu,"cpu_frame_ms":%.4f,"draw_calls":%u,"elements":%llu})",
       static_cast<unsigned long long>(frame_idx), cpu_frame_ms, draw_calls,
       static_cast<unsigned long long>(total_elements));
-  return {buf.data()};
+  std::string out{buf.data()};
+  append_gpu_ms(out, gpu_frame_ms);
+  return out;
 }
 
 std::string format_pass_event(uint64_t frame_idx, const PassSummary& pass) {
   const auto tag = pass_tag_name(pass.tag);
-  std::array<char, 256> buf{};
+  std::array<char, 320> buf{};
   std::snprintf(
       buf.data(), buf.size(),
       R"({"type":"gpu_pass","frame_idx":%llu,"pass_id":%u,"tag":"%.*s","draws":%u,"elements":%llu,"rt_width":%u,"rt_height":%u,"rtv_count":%u,"blend":%s,"depth_write":%s})",
@@ -95,7 +110,9 @@ std::string format_pass_event(uint64_t frame_idx, const PassSummary& pass) {
       static_cast<unsigned>(pass.rt_width), static_cast<unsigned>(pass.rt_height),
       static_cast<unsigned>(pass.rtv_count), pass.blend_enabled ? "true" : "false",
       pass.depth_write ? "true" : "false");
-  return {buf.data()};
+  std::string out{buf.data()};
+  append_gpu_ms(out, pass.gpu_ms);
+  return out;
 }
 
 std::string format_draw_site_event(uint64_t frame_idx, const CallSiteStats& site) {
@@ -134,7 +151,7 @@ std::vector<std::string> serialize_frame_snapshot(const FrameTraceSnapshot& snap
       snap.new_resources, std::back_inserter(lines),
       [&](const ResourceSummary& res) { return format_resource_event(snap.frame_index, res); });
   lines.push_back(format_frame_event(snap.frame_index, cpu_frame_ms, snap.total_draw_calls,
-                                     snap.total_elements));
+                                     snap.total_elements, snap.gpu_frame_ms));
   std::ranges::transform(snap.passes, std::back_inserter(lines), [&](const PassSummary& pass) {
     return format_pass_event(snap.frame_index, pass);
   });

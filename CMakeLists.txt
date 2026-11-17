@@ -30,12 +30,14 @@ add_library(soulsframe_core STATIC
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
   src/timing/frame_stats.cpp
+  src/timing/gpu_timing.cpp
 )
 target_include_directories(soulsframe_core PUBLIC src)
 target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})
 target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::xxhash)
 
 add_library(soulsframe_probe_core STATIC
+  src/probe/gpu_join.cpp
   src/probe/jsonl_writer.cpp
   src/probe/trace_types.cpp
 )
@@ -87,6 +89,7 @@ if(NOT SF_HOST_ONLY)
   if(SF_PROBE)
     target_sources(soulsframe PRIVATE
       src/gfx/d3d11/context_hook.cpp
+      src/gfx/d3d11/gpu_timer.cpp
       src/probe/probe_module.cpp
     )
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)

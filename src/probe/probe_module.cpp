@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <iterator>
 #include <utility>
 #include <vector>
 
@@ -62,8 +63,12 @@ bool ProbeModule::init(const sf::GameProfile& profile, const sf::Config& cfg) {
   gfx::ContextHookCallbacks cbs;
   cbs.on_draw = &ProbeModule::on_draw_trampoline;
   cbs.on_resource = &ProbeModule::on_resource_trampoline;
+  cbs.pass_count = &ProbeModule::pass_count_trampoline;
   cbs.trace_resources = cfg.probe.trace_resources;
+  cbs.gpu_timing = cfg.probe.gpu_timing;
   cbs.user = this;
+  gpu_timing_ = cfg.probe.gpu_timing;
+  joiner_ = GpuFrameJoiner(8);
 
   if (!gfx::install_context_hooks(cbs)) {
     SF_LOG("ProbeModule: D3D11 context hook install failed");
@@ -99,7 +104,22 @@ void ProbeModule::on_present(sf::PresentCtx& ctx) {
     }
   }
 
-  enqueue_lines(serialize_frame_snapshot(snap, ctx.delta_ms), hit_limit);
+  std::vector<std::string> lines;
+  if (gpu_timing_) {
+    // Close the GPU-timed frame, then attach any results that finished (older frames).
+    for (const auto& result : gfx::gpu_timing_present(ctx.swap_chain, ctx.frame_index)) {
+      joiner_.on_gpu_result(result.frame_index, result.timing);
+    }
+    joiner_.push(std::move(snap), ctx.delta_ms);
+    for (const auto& ready : joiner_.take_ready(hit_limit)) {
+      auto frame_lines = serialize_frame_snapshot(ready.snap, ready.cpu_frame_ms);
+      lines.insert(lines.end(), std::make_move_iterator(frame_lines.begin()),
+                   std::make_move_iterator(frame_lines.end()));
+    }
+  } else {
+    lines = serialize_frame_snapshot(snap, ctx.delta_ms);
+  }
+  enqueue_lines(std::move(lines), hit_limit);
 
   if (hit_limit) {
     // Joining from Present (outside DllMain loader lock) finalizes the capture cleanly.
@@ -121,6 +141,15 @@ void ProbeModule::on_draw_trampoline(const DrawCallState& state, void* user) {
   if (auto* self = static_cast<ProbeModule*>(user)) {
     self->record_draw_event(state);
   }
+}
+
+uint32_t ProbeModule::pass_count_trampoline(void* user) {
+  auto* self = static_cast<ProbeModule*>(user);
+  if (!self) {
+    return 0;
+  }
+  std::lock_guard lk(self->trace_mu_);
+  return self->recorder_.pass_count();
 }
 
 void ProbeModule::on_resource_trampoline(const ResourceSummary& resource, void* user) {

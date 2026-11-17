@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/module.h"
+#include "probe/gpu_join.h"
 #include "probe/trace_types.h"
 
 #include <atomic>
@@ -36,6 +37,7 @@ public:
 private:
   static void on_draw_trampoline(const DrawCallState& state, void* user);
   static void on_resource_trampoline(const ResourceSummary& resource, void* user);
+  static uint32_t pass_count_trampoline(void* user);
 
   void record_draw_event(const DrawCallState& state);
   void record_resource_event(const ResourceSummary& resource);
@@ -54,6 +56,10 @@ private:
 
   std::mutex trace_mu_;
   TraceRecorder recorder_;
+
+  /// Delays frame serialization until GPU timestamps resolve (render thread only).
+  GpuFrameJoiner joiner_{8};
+  bool gpu_timing_ = false;
 
   std::ofstream out_stream_;
   std::mutex queue_mu_;

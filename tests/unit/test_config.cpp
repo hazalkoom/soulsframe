@@ -192,3 +192,16 @@ TEST_CASE("config validates [probe] settings and rejects unsafe output paths") {
   CHECK(wrong_file_type.config.probe.output_file == "soulsframe_capture.jsonl");
   CHECK(wrong_file_type.warnings.size() == 2);
 }
+
+TEST_CASE("probe.gpu_timing defaults on, can be disabled, and rejects wrong types") {
+  CHECK(sf::Config::defaults().probe.gpu_timing);
+
+  const auto off = sf::parse_config_toml("[probe]\ngpu_timing = false\n");
+  CHECK(off.parsed_ok);
+  CHECK_FALSE(off.config.probe.gpu_timing);
+  CHECK(off.warnings.empty());
+
+  const auto bad = sf::parse_config_toml("[probe]\ngpu_timing = \"yes\"\n");
+  CHECK(bad.config.probe.gpu_timing); // falls back to the safe default
+  CHECK_FALSE(bad.warnings.empty());
+}

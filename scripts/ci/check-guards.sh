@@ -31,6 +31,8 @@ pure_files=(
   src/games/ds3/profile.cpp
   src/hooks/sigscan.h
   src/hooks/sigscan.cpp
+  src/probe/gpu_join.h
+  src/probe/gpu_join.cpp
   src/probe/jsonl_writer.h
   src/probe/jsonl_writer.cpp
   src/probe/trace_types.h
@@ -39,6 +41,8 @@ pure_files=(
   src/tex/content_hash.cpp
   src/timing/frame_stats.h
   src/timing/frame_stats.cpp
+  src/timing/gpu_timing.h
+  src/timing/gpu_timing.cpp
 )
 
 for f in "${pure_files[@]}"; do

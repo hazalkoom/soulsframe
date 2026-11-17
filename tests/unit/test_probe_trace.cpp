@@ -190,3 +190,28 @@ TEST_CASE("TraceRecorder enforces caps and deduplicates session resources") {
   rec.begin_frame(3);
   CHECK(rec.record_resource(rt1) == true);
 }
+
+TEST_CASE("TraceRecorder::pass_count tracks pass boundaries and resets per frame") {
+  using namespace sf::probe;
+  TraceRecorder rec;
+  rec.begin_frame(1);
+  CHECK(rec.pass_count() == 0);
+
+  DrawCallState a{.vertex_or_index_count = 3,
+                  .rtv_signature = 0x1,
+                  .rt_width = 8,
+                  .rt_height = 8,
+                  .rtv_count = 1};
+  rec.record_draw(a);
+  CHECK(rec.pass_count() == 1);
+  rec.record_draw(a); // same render targets -> same pass
+  CHECK(rec.pass_count() == 1);
+
+  DrawCallState b = a;
+  b.rtv_signature = 0x2; // render-target switch opens a new pass
+  rec.record_draw(b);
+  CHECK(rec.pass_count() == 2);
+
+  rec.begin_frame(2);
+  CHECK(rec.pass_count() == 0);
+}
