@@ -41,6 +41,7 @@ It also ships a **reverse-engineering toolkit** (`sf-probe` inside the DLL, `sft
 | [`docs/08-logging-and-telemetry.md`](docs/08-logging-and-telemetry.md) | You want the runtime logging, JSONL capture schema, and extraction plan. |
 | [`docs/09-codebase-reference.md`](docs/09-codebase-reference.md) | You want a file-by-file map of every module and symbol implemented so far. |
 | [`docs/guide-for-vibe-coders.md`](docs/guide-for-vibe-coders.md) | You want a quick plain-English tour of how the mod works without deep C++/DirectX jargon. |
+| [`docs/13-vibe-coder-cheatsheet.md`](docs/13-vibe-coder-cheatsheet.md) | You want a one-page quick reference: commands, config keys, safety rules, and where to look when something breaks. |
 | [`docs/10-deep-dive-for-learners-and-vibe-coders.md`](docs/10-deep-dive-for-learners-and-vibe-coders.md) | You want a zero-to-systems masterclass explaining DLL proxying, COM vtables, MinHook, harsh CI, safe recipes, and career leverage. |
 | [`docs/11-ai-agent-orchestration-opencode-agy.md`](docs/11-ai-agent-orchestration-opencode-agy.md) | You want to orchestrate **OpenCode + Antigravity (AGY)** side-by-side cleanly using Git worktrees and structured handoffs. |
 | [`docs/12-ai-agent-playbooks-and-roles.md`](docs/12-ai-agent-playbooks-and-roles.md) | You want AI specialist role checklists, `clang-tidy`/`cppcheck` idioms, and real M0–M2 bug post-mortems. |
