@@ -1,6 +1,7 @@
 #include "timing/gpu_timing.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace sf::timing {
 
@@ -37,13 +38,12 @@ GpuSlotRing::GpuSlotRing(size_t capacity)
     : states_(std::max<size_t>(capacity, 1), State::Free), frames_(states_.size(), 0) {}
 
 std::optional<size_t> GpuSlotRing::begin_frame() {
-  for (size_t i = 0; i < states_.size(); ++i) {
-    if (states_[i] == State::Free) {
-      states_[i] = State::Recording;
-      return i;
-    }
+  const auto it = std::ranges::find(states_, State::Free);
+  if (it == states_.end()) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  *it = State::Recording;
+  return static_cast<size_t>(std::distance(states_.begin(), it));
 }
 
 void GpuSlotRing::submit_frame(size_t slot, uint64_t frame_index) {
