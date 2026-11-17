@@ -31,6 +31,8 @@ pure_files=(
   src/games/ds3/profile.cpp
   src/hooks/sigscan.h
   src/hooks/sigscan.cpp
+  src/probe/gpu_join.h
+  src/probe/gpu_join.cpp
   src/probe/jsonl_writer.h
   src/probe/jsonl_writer.cpp
   src/probe/trace_types.h
