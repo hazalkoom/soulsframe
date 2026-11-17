@@ -48,6 +48,15 @@
       "cacheVariables": {
         "SF_COVERAGE": "ON"
       }
+    },
+    {
+      "name": "host-bench",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SF_HOST_ONLY": "ON",
+        "SF_BUILD_BENCH": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -55,7 +64,8 @@
     { "name": "win64-probe",   "configurePreset": "win64-probe" },
     { "name": "host-tests",    "configurePreset": "host-tests" },
     { "name": "host-asan",     "configurePreset": "host-asan" },
-    { "name": "host-cov",      "configurePreset": "host-cov" }
+    { "name": "host-cov",      "configurePreset": "host-cov" },
+    { "name": "host-bench",    "configurePreset": "host-bench" }
   ],
   "testPresets": [
     {
@@ -71,6 +81,11 @@
     {
       "name": "host-cov",
       "configurePreset": "host-cov",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "host-bench",
+      "configurePreset": "host-bench",
       "output": { "outputOnFailure": true }
     }
   ]

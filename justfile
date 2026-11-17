@@ -27,6 +27,9 @@ test-asan:
 test-cov:
     bash scripts/ci/run-coverage.sh
 
+bench:
+    cmake --preset host-bench -DSF_WERROR=ON && cmake --build --preset host-bench && ./build/host-bench/tests/bench/soulsframe_benchmarks
+
 smoke:
     {{run}} sf-wine-test bash scripts/smoke-test.sh
 
