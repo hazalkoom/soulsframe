@@ -39,6 +39,8 @@ jobs:
       heavy: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.cpp == 'true' || steps.filter.outputs.automation == 'true' || steps.filter.outputs.workflow == 'true' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - id: filter
         uses: dorny/paths-filter@v3
         with:
