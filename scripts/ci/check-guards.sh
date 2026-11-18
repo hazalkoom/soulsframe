@@ -29,12 +29,16 @@ pure_files=(
   src/core/sha256.cpp
   src/games/ds3/profile.h
   src/games/ds3/profile.cpp
+  src/games/ds3/sig_db.h
+  src/games/ds3/sig_db.cpp
   src/hooks/sigscan.h
   src/hooks/sigscan.cpp
   src/probe/gpu_join.h
   src/probe/gpu_join.cpp
   src/probe/jsonl_writer.h
   src/probe/jsonl_writer.cpp
+  src/probe/pe_dump.h
+  src/probe/pe_dump.cpp
   src/probe/trace_types.h
   src/probe/trace_types.cpp
   src/tex/content_hash.h

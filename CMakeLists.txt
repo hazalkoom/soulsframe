@@ -11,6 +11,7 @@ option(SF_SANITIZE "Enable Address and UndefinedBehavior sanitizers on host buil
 option(SF_COVERAGE "Enable gcov/lcov code coverage instrumentation on host builds" OFF)
 option(SF_BUILD_TESTBED "Build the D3D11 smoke-testbed executable" OFF)
 option(SF_BUILD_BENCH "Build host micro-benchmark suite" OFF)
+option(SF_BUILD_TOOLS "Build native host CLI tools (sftool)" ON)
 option(SF_WERROR "Treat compiler warnings as errors on SoulsFrame targets" OFF)
 
 if(SF_WERROR)
@@ -27,6 +28,7 @@ add_library(soulsframe_core STATIC
   src/core/offline_guard.cpp
   src/core/sha256.cpp
   src/games/ds3/profile.cpp
+  src/games/ds3/sig_db.cpp
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
   src/timing/frame_stats.cpp
@@ -39,6 +41,7 @@ target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::
 add_library(soulsframe_probe_core STATIC
   src/probe/gpu_join.cpp
   src/probe/jsonl_writer.cpp
+  src/probe/pe_dump.cpp
   src/probe/trace_types.cpp
 )
 target_include_directories(soulsframe_probe_core PUBLIC src)
@@ -91,6 +94,7 @@ if(NOT SF_HOST_ONLY)
       src/gfx/d3d11/context_hook.cpp
       src/gfx/d3d11/gpu_timer.cpp
       src/probe/probe_module.cpp
+      src/probe/win_dump.cpp
     )
     target_compile_definitions(soulsframe PRIVATE SF_PROBE=1)
     target_link_libraries(soulsframe PRIVATE soulsframe_probe_core)
@@ -115,6 +119,9 @@ if(NOT SF_HOST_ONLY)
 else()
   enable_testing()
   add_subdirectory(tests/unit)
+  if(SF_BUILD_TOOLS)
+    add_subdirectory(tools/cpp)
+  endif()
   if(SF_BUILD_BENCH)
     add_subdirectory(tests/bench)
   endif()

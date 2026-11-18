@@ -49,7 +49,8 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
 - **M0 (Toolchain + containers) & M1 (First light skeleton):** **Implemented** — pure C++ core, `dinput8.dll` proxy + `Present`/`ResizeBuffers` MinHook hooks, container Dockerfiles, D3D11 testbed, CI/CodeQL/security workflows.
 - **M2 (`sf-probe` v1 draw-call tracer):** **Implemented** — pure `TraceRecorder` & JSONL serializer, `ID3D11DeviceContext` vtable hooks (7 slots, `SF_PROBE=1`), async `ProbeModule`, `[probe]` config kill switches, `gcovr` coverage gate (`host-cov`), 3 `libFuzzer` targets, 4-scenario Wine smoke suite (`--particles`), and extended `analyze_capture.py`.
 - **M3 (GPU pass timing + benchmarks):** **Implemented** — pure `gpu_timing`/`GpuFrameJoiner` (Linux-tested), `GpuTimer` D3D11 timestamp queries wired into the probe (`probe.gpu_timing` kill switch, `gpu_ms` JSONL fields), Release `host-bench` micro-benchmark suite + CI job, analyzer GPU stats.
-- **Next milestones:** M4 (Ghidra memory dump + signature DB), M5 (presentation/flip-model experiments), M6 (low-res particles), M7 (FSR 1), M8 (FPS unlock research).
+- **M4 (RE foundation):** **Implemented** — pure `pe_dump` & `sig_db` (Linux-tested, `ds3_sigs.toml` + RIP-relative resolver), read-only Win32 `win_dump` (`probe.dump_module`, Wine-verified), native `sftool` CLI, headless Ghidra `ExportSymbols.java`.
+- **Next milestones:** M5 (presentation/flip-model experiments), M6 (low-res particles), M7 (FSR 1), M8 (FPS unlock research).
 
 ## Commit & documentation workflow
 

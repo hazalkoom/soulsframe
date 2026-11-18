@@ -52,6 +52,7 @@ jobs:
             cpp:
               - 'src/**'
               - 'tests/**'
+              - 'tools/cpp/**'
               - 'CMakeLists.txt'
               - 'CMakePresets.json'
               - 'cmake/**'
@@ -98,7 +99,7 @@ jobs:
       - name: Install analysis tools
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang clang-format clang-tidy cppcheck
       - name: Verify clang-format compliance
-        run: find src tests -regex '.*\.\(h\|cpp\)' -exec clang-format --dry-run --Werror {} +
+        run: find src tests tools/cpp -regex '.*\.\(h\|cpp\)' -exec clang-format --dry-run --Werror {} +
       - name: Configure host compile database for clang-tidy
         run: cmake --preset host-tests -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSF_WERROR=ON
       - name: Run clang-tidy on pure C++ modules
@@ -109,9 +110,11 @@ jobs:
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/sig_db.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
+            src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp \
@@ -136,9 +139,11 @@ jobs:
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/sig_db.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
+            src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp \
