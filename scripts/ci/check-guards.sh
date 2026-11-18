@@ -29,6 +29,8 @@ pure_files=(
   src/core/sha256.cpp
   src/games/ds3/profile.h
   src/games/ds3/profile.cpp
+  src/games/ds3/sig_db.h
+  src/games/ds3/sig_db.cpp
   src/hooks/sigscan.h
   src/hooks/sigscan.cpp
   src/probe/gpu_join.h

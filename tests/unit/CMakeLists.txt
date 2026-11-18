@@ -12,6 +12,7 @@ add_executable(soulsframe_unit_tests
   test_profile.cpp
   test_security_inputs.cpp
   test_sha256.cpp
+  test_sig_db.cpp
   test_sigscan.cpp
 )
 

@@ -1,0 +1,22 @@
+# SoulsFrame Dark Souls III Signature Database (M4 RE Foundation)
+#
+# Rules:
+# - Every `[build."<sha256>"]` table MUST be keyed by the exact lowercase SHA-256 of the host exe.
+# - `verified = true` may ONLY be set after verifying every signature on an offline runtime dump
+#   via `sftool sigtest` and a live offline session. Unknown/unverified builds stay Telemetry-only.
+# - Never commit proprietary binaries or dumps under `re/dumps/`.
+
+# Example schema (disabled by `verified = false` until populated from your own dump):
+# [build."0000000000000000000000000000000000000000000000000000000000000000"]
+# version = "1.15.2"
+# verified = false
+#
+# [[build."0000000000000000000000000000000000000000000000000000000000000000".sig]]
+# name        = "frame_dt_read"
+# pattern     = "F3 0F 10 05 ? ? ? ? F3 0F 59 ?"
+# offset      = 0
+# disp_offset = 4
+# insn_len    = 8
+# kind        = "rip_rel_data"
+# confidence  = "guessed"
+# notes       = "Reads global delta-time float; verify in offline Ghidra dump"

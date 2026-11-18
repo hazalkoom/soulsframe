@@ -51,6 +51,7 @@ jobs:
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/sig_db.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
@@ -79,6 +80,7 @@ jobs:
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/sig_db.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \

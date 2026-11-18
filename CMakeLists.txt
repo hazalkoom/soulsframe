@@ -27,6 +27,7 @@ add_library(soulsframe_core STATIC
   src/core/offline_guard.cpp
   src/core/sha256.cpp
   src/games/ds3/profile.cpp
+  src/games/ds3/sig_db.cpp
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
   src/timing/frame_stats.cpp
