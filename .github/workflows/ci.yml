@@ -52,6 +52,7 @@ jobs:
             cpp:
               - 'src/**'
               - 'tests/**'
+              - 'tools/cpp/**'
               - 'CMakeLists.txt'
               - 'CMakePresets.json'
               - 'cmake/**'
