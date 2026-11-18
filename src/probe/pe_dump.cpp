@@ -123,7 +123,7 @@ PeImageInfo inspect_pe64(std::span<const std::byte> image) {
 
   info.sections.reserve(num_sections);
   for (uint16_t i = 0; i < num_sections; ++i) {
-    const size_t s_off = sec_table_off + static_cast<size_t>(i) * kSectionHeaderSize;
+    const size_t s_off = sec_table_off + (static_cast<size_t>(i) * kSectionHeaderSize);
     PeSectionInfo sec;
     sec.name = read_section_name(image, s_off);
     sec.virtual_size = read_u32(image, s_off + 8U);
@@ -156,7 +156,7 @@ PeFixupResult fixup_pe_dump_for_ghidra(std::span<std::byte> dump_bytes,
   const size_t sec_count = info.sections.size();
   for (size_t i = 0; i < sec_count; ++i) {
     const auto& sec = info.sections[i];
-    const size_t s_off = static_cast<size_t>(info.section_table_offset) + i * kSectionHeaderSize;
+    const size_t s_off = static_cast<size_t>(info.section_table_offset) + (i * kSectionHeaderSize);
 
     const uint32_t desired_vsize = sec.virtual_size > 0 ? sec.virtual_size : sec.raw_size;
     if (sec.virtual_address >= dump_bytes.size()) {

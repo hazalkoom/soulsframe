@@ -102,13 +102,13 @@ SigDbParseResult parse_sig_db_toml(std::string_view toml_text) {
   }
 
   const auto* builds_tbl = root["build"].as_table();
-  if (!builds_tbl) {
+  if (builds_tbl == nullptr) {
     return out;
   }
 
   for (const auto& [sha_key, node] : *builds_tbl) {
     const auto* btbl = node.as_table();
-    if (!btbl) {
+    if (btbl == nullptr) {
       out.warnings.emplace_back("Ignoring non-table entry under build." +
                                 std::string(sha_key.str()));
       continue;
@@ -123,10 +123,10 @@ SigDbParseResult parse_sig_db_toml(std::string_view toml_text) {
       bset.verified = *ver_flag;
     }
 
-    if (const auto* sigs_arr = (*btbl)["sig"].as_array()) {
+    if (const auto* sigs_arr = (*btbl)["sig"].as_array(); sigs_arr != nullptr) {
       for (const auto& item : *sigs_arr) {
         const auto* stbl = item.as_table();
-        if (!stbl) {
+        if (stbl == nullptr) {
           out.warnings.emplace_back("Skipping non-table signature entry");
           continue;
         }
