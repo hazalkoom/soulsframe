@@ -54,6 +54,7 @@ jobs:
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
+            src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp \
@@ -81,6 +82,7 @@ jobs:
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
+            src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
             src/timing/frame_stats.cpp \

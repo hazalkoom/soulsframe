@@ -35,6 +35,8 @@ pure_files=(
   src/probe/gpu_join.cpp
   src/probe/jsonl_writer.h
   src/probe/jsonl_writer.cpp
+  src/probe/pe_dump.h
+  src/probe/pe_dump.cpp
   src/probe/trace_types.h
   src/probe/trace_types.cpp
   src/tex/content_hash.h

@@ -39,6 +39,7 @@ target_link_libraries(soulsframe_core PUBLIC tomlplusplus::tomlplusplus xxHash::
 add_library(soulsframe_probe_core STATIC
   src/probe/gpu_join.cpp
   src/probe/jsonl_writer.cpp
+  src/probe/pe_dump.cpp
   src/probe/trace_types.cpp
 )
 target_include_directories(soulsframe_probe_core PUBLIC src)
