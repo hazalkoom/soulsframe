@@ -1,10 +1,12 @@
 name: ci
 on:
   push:
-    branches: [main, develop, "feat/**", "fix/**", "test/**", "docs/**", "ci/**"]
+    branches: [main, develop]
   pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -24,7 +26,48 @@ jobs:
             | tar -xz -C /tmp gitleaks
           /tmp/gitleaks detect --source . --verbose --redact --exit-code 1
 
+  changes:
+    name: Classify changed files
+    needs: guards
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docs == 'true' }}
+      cpp: ${{ steps.filter.outputs.cpp }}
+      python: ${{ steps.filter.outputs.python }}
+      automation: ${{ steps.filter.outputs.automation }}
+      workflow: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.workflow == 'true' }}
+      heavy: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.cpp == 'true' || steps.filter.outputs.automation == 'true' || steps.filter.outputs.workflow == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - '**/*.md'
+              - 'docs/**'
+              - 'reports/**'
+            cpp:
+              - 'src/**'
+              - 'tests/**'
+              - 'CMakeLists.txt'
+              - 'CMakePresets.json'
+              - 'cmake/**'
+              - 'config/**'
+              - 'justfile'
+            python:
+              - 'tools/py/**'
+              - '**/*.py'
+            automation:
+              - 'scripts/**'
+              - 'docker/**'
+            workflow:
+              - '.github/workflows/**'
+              - '.github/dependabot.yml'
+
   docs:
+    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.workflow == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,8 +75,21 @@ jobs:
         with:
           globs: "**/*.md"
 
+  python-tools:
+    name: Python telemetry self-tests
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.workflow == 'true'
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run stdlib telemetry self-tests
+        run: |
+          python3 tools/py/analyze_capture.py --self-test
+          python3 tools/py/plot_gpu_passes.py --self-test
+
   static-analysis:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -87,7 +143,8 @@ jobs:
             src/timing/gpu_timing.cpp
 
   host-tests:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -106,7 +163,8 @@ jobs:
       - run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
   benchmarks:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -153,7 +211,8 @@ jobs:
           path: build/host-bench/bench-results.json
 
   coverage:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -195,7 +254,8 @@ jobs:
           path: build/host-cov/report/
 
   fuzz-smoke:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -235,7 +295,8 @@ jobs:
           ./build/host-fuzz/fuzz_probe_jsonl tests/fuzz/corpus/probe_jsonl -max_total_time=10
 
   win64:
-    needs: guards
+    if: needs.changes.outputs.heavy == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     container: registry.fedoraproject.org/fedora:43
     steps:
@@ -318,7 +379,8 @@ jobs:
             build/win64-probe/soulsframe_capture.jsonl
 
   docker-verify:
-    needs: guards
+    if: needs.changes.outputs.automation == 'true' || needs.changes.outputs.workflow == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

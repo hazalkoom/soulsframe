@@ -2,7 +2,7 @@ name: Security Hardening & Supply-Chain Audit
 
 on:
   push:
-    branches: [main, develop, "feat/**", "fix/**", "test/**", "docs/**", "ci/**"]
+    branches: [main, develop]
   pull_request:
     branches: [main, develop]
   schedule:
