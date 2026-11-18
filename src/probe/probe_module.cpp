@@ -5,6 +5,7 @@
 #include "games/ds3/profile.h"
 #include "gfx/d3d11/context_hook.h"
 #include "probe/jsonl_writer.h"
+#include "probe/win_dump.h"
 
 #include <chrono>
 #include <filesystem>
@@ -74,6 +75,19 @@ bool ProbeModule::init(const sf::GameProfile& profile, const sf::Config& cfg) {
     SF_LOG("ProbeModule: D3D11 context hook install failed");
     shutdown();
     return false;
+  }
+
+  if (cfg.probe.dump_module) {
+    const std::filesystem::path dump_path =
+        std::filesystem::path(output_dir_) / cfg.probe.dump_file;
+    const auto dmp = dump_host_module_to_file(dump_path.string());
+    if (dmp.ok) {
+      SF_LOG("ProbeModule: MemDump ok (%zu bytes, base=0x%llx, regions=%u/%u, sections=%u) -> %s",
+             dmp.bytes_written, static_cast<unsigned long long>(dmp.image_base), dmp.regions_copied,
+             dmp.regions_skipped, dmp.sections_fixed, dump_path.string().c_str());
+    } else {
+      SF_LOG("ProbeModule: MemDump failed: %s", dmp.error.c_str());
+    }
   }
 
   SF_LOG("ProbeModule active: capturing up to %u frames -> %s", max_capture_frames_,
