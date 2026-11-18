@@ -74,7 +74,7 @@ if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
     cp "$BUILD_DIR/d3d11_testbed.exe" "$PROBE_DIR/d3d11_testbed.exe"
   fi
   cd "$PROBE_DIR"
-  rm -f soulsframe.log soulsframe.toml soulsframe_capture.jsonl
+  rm -f soulsframe.log soulsframe.toml soulsframe_capture.jsonl soulsframe_mem_dump.exe
   cat > soulsframe.toml <<'EOF'
 [general]
 offline_acknowledged = true
@@ -90,10 +90,14 @@ presentation = false
 capture_frames = 20
 output_file = "soulsframe_capture.jsonl"
 trace_resources = true
+dump_module = true
+dump_file = "soulsframe_mem_dump.exe"
 EOF
   timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 30 --particles
   grep -q "Present hook installed" soulsframe.log
   grep -q "ID3D11DeviceContext hooks installed" soulsframe.log
+  grep -q "ProbeModule: MemDump ok" soulsframe.log
+  test -s soulsframe_mem_dump.exe
   grep -q "ProbeModule reached capture_frames limit (20)" soulsframe.log
   grep -q "ID3D11DeviceContext hooks removed" soulsframe.log
   grep -q '"type":"session_header"' soulsframe_capture.jsonl
@@ -103,7 +107,7 @@ EOF
   if command -v python3 >/dev/null 2>&1 && [ -f "$REPO_ROOT/tools/py/analyze_capture.py" ]; then
     python3 "$REPO_ROOT/tools/py/analyze_capture.py" soulsframe_capture.jsonl > /dev/null
   fi
-  rm -f soulsframe.toml
+  rm -f soulsframe.toml soulsframe_mem_dump.exe
   SCENARIO_4_OK=true
   cd "$BUILD_DIR"
 fi

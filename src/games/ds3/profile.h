@@ -32,7 +32,13 @@ struct GameProfile {
 
 namespace sf::games::ds3 {
 
+struct SigDb;
+
 /// Looks up a Dark Souls III `GameProfile` keyed by the host executable's SHA-256 hash.
 GameProfile resolve_profile(std::string_view exe_sha256);
+
+/// Looks up a Dark Souls III `GameProfile` keyed by `exe_sha256` against a parsed signature DB.
+/// Engine hooks remain disabled unless `exe_sha256` matches a build explicitly marked `verified`.
+GameProfile resolve_profile(std::string_view exe_sha256, const SigDb& db);
 
 } // namespace sf::games::ds3

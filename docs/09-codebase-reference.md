@@ -1,4 +1,4 @@
-# 09. Codebase reference (M0/M1 foundation + M2 probe v1 + M3 GPU timing)
+# 09. Codebase reference (M0–M4 RE foundation)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -50,6 +50,8 @@ flowchart TD
 | [src/tex/content_hash.h](../src/tex/content_hash.h) / [.cpp](../src/tex/content_hash.cpp) | `sf::tex::hash_bytes()`, `sf::tex::hash_hex()` | Fast 64-bit `XXH64` content hashing for future texture and shader registries. |
 | [src/hooks/sigscan.h](../src/hooks/sigscan.h) / [.cpp](../src/hooks/sigscan.cpp) | `sf::hooks::parse_pattern()`, `sf::hooks::sigscan()` | IDA-style byte-signature parser/scanner that refuses ambiguous multiple matches. |
 | [src/games/ds3/profile.h](../src/games/ds3/profile.h) / [.cpp](../src/games/ds3/profile.cpp) | `sf::GameProfile`, `sf::games::ds3::resolve_profile()` | Build-hash lookup; unknown hashes disable engine hooks while keeping telemetry active. |
+| [src/games/ds3/sig_db.h](../src/games/ds3/sig_db.h) / [.cpp](../src/games/ds3/sig_db.cpp) | `sf::games::ds3::parse_sig_db_toml()`, `resolve_signature_target()` | SHA-256 keyed `ds3_sigs.toml` loader and strict unique pattern + x64 `[rip + disp32]` resolver. |
+| [src/probe/pe_dump.h](../src/probe/pe_dump.h) / [.cpp](../src/probe/pe_dump.cpp) | `sf::probe::inspect_pe64()`, `fixup_pe_dump_for_ghidra()` | Pure PE32+ parser and unaligned runtime dump section fixer for headless Ghidra. |
 | [src/probe/trace_types.h](../src/probe/trace_types.h) / [.cpp](../src/probe/trace_types.cpp) | `sf::probe::TraceRecorder`, `DrawCallState`, `classify_pass()`, `PassSummary`, `CallSiteStats` | Pure-C++ M2 draw-call aggregator, pass-boundary detector, resource deduplicator, and heuristic pass classifier (`particles_alpha`, `gbuffer`, `shadow`, etc.). |
 | [src/probe/jsonl_writer.h](../src/probe/jsonl_writer.h) / [.cpp](../src/probe/jsonl_writer.cpp) | `sf::probe::format_session_header()`, `serialize_frame_snapshot()`, `json_escape()` | Pure-C++ JSONL event serializer emitting `session_header`, `resource`, `frame`, `gpu_pass`, and `draw_site` records. |
 
@@ -63,14 +65,16 @@ flowchart TD
 | [src/gfx/d3d11/swapchain_hook.h](../src/gfx/d3d11/swapchain_hook.h) / [.cpp](../src/gfx/d3d11/swapchain_hook.cpp) | `install_swapchain_hooks()`, `hooked_present()`, `hooked_resize_buffers()` | Creates a dummy D3D11 device to resolve `IDXGISwapChain` vtable slots 8 & 13 and hooks them with MinHook. |
 | [src/gfx/d3d11/context_hook.h](../src/gfx/d3d11/context_hook.h) / [.cpp](../src/gfx/d3d11/context_hook.cpp) | `install_context_hooks()`, `remove_context_hooks()` | (`SF_PROBE=1` only) Hooks 7 `ID3D11DeviceContext` vtable slots (`DrawIndexed`, `Draw`, `DrawIndexedInstanced`, `DrawInstanced`, `Dispatch`, `ClearRenderTargetView`, `ClearDepthStencilView`), capturing RTV/blend/depth/shader/RVA state cleanly with COM reference counting and re-entrancy guards. |
 | [src/gfx/d3d11/gpu_timer.h](../src/gfx/d3d11/gpu_timer.h) / [.cpp](../src/gfx/d3d11/gpu_timer.cpp) | `sf::gfx::GpuTimer`, `GpuFrameResult` | (`SF_PROBE=1` only) D3D11 `TIMESTAMP`/`TIMESTAMP_DISJOINT` queries in an 8-slot ring: one stamp per pass start plus end of frame, polled with `DONOTFLUSH` so the GPU is never stalled; degrades to no `gpu_ms` if queries are unsupported. |
-| [src/probe/probe_module.h](../src/probe/probe_module.h) / [.cpp](../src/probe/probe_module.cpp) | `sf::probe::ProbeModule` | (`SF_PROBE=1` only) `sf::Module` implementation bridging `context_hook` -> `TraceRecorder` -> background JSONL writer thread with loader-lock-safe shutdown. |
+| [src/probe/probe_module.h](../src/probe/probe_module.h) / [.cpp](../src/probe/probe_module.cpp) | `sf::probe::ProbeModule` | (`SF_PROBE=1` only) `sf::Module` implementation bridging `context_hook` -> `TraceRecorder` -> background JSONL writer thread with loader-lock-safe shutdown and optional `MemDump`. |
+| [src/probe/win_dump.h](../src/probe/win_dump.h) / [.cpp](../src/probe/win_dump.cpp) | `sf::probe::dump_host_module_to_file()` | (`SF_PROBE=1` only) Read-only `VirtualQuery` memory dump + Ghidra section alignment fixup (`probe.dump_module`). |
+| [tools/cpp/sftool_main.cpp](../tools/cpp/sftool_main.cpp) | `sftool` (`builds hash`, `pe-info`, `pe-fixup`, `sigmaker`, `sigtest`) | Native Linux host CLI sharing `soulsframe_core` and `soulsframe_probe_core` for signature verification and PE dump analysis. |
 | [src/core/dllmain.cpp](../src/core/dllmain.cpp) | `DllMain`, `init_thread`, `FrameTelemetryModule` | Spawns background initialization outside loader lock, registers active modules (`FrameTelemetryModule`, plus `ProbeModule` in `SF_PROBE`), and orchestrates clean shutdown. |
 
 ## 5. Tests and verification scripts
 
 | File | Layer | Purpose |
 |---|---|---|
-| [tests/unit/](../tests/unit/) | L1 (Linux native) | 13 `doctest` suites (51 test cases, 870 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) and adversarial inputs with `SF_WERROR=ON`. |
+| [tests/unit/](../tests/unit/) | L1 (Linux native) | 15 `doctest` suites (60 test cases, 110,951 assertions) stress-testing all pure C++ modules (`soulsframe_core` + `soulsframe_probe_core`) and adversarial inputs with `SF_WERROR=ON`. |
 | [tests/bench/](../tests/bench/) | L1 (Linux Release) | Micro-benchmark harness and 12 Release `-O3` benchmarks (`soulsframe_benchmarks`) measuring `FrameStats`, `TraceRecorder`, `jsonl_writer`, `XXH64`, `SHA-256`, `sigscan`, and `parse_config_toml` with `--json` artifact export. |
 | [tests/fuzz/](../tests/fuzz/) | L2 (Linux libFuzzer + ASan/UBSan) | 3 libFuzzer targets (`fuzz_config`, `fuzz_sigscan`, `fuzz_probe_jsonl`) and seed corpora exercised on every CI run. |
 | [scripts/ci/run-coverage.sh](../scripts/ci/run-coverage.sh) | L1 (Linux `gcovr`) | Configures `host-cov`, runs `ctest`, generates HTML/XML/JSON reports, and enforces `SF_MIN_LINE_COVERAGE=90`. |

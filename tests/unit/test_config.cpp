@@ -205,3 +205,29 @@ TEST_CASE("probe.gpu_timing defaults on, can be disabled, and rejects wrong type
   CHECK(bad.config.probe.gpu_timing); // falls back to the safe default
   CHECK_FALSE(bad.warnings.empty());
 }
+
+TEST_CASE("probe.dump_module defaults off and dump_file blocks traversal") {
+  const auto def = sf::Config::defaults();
+  CHECK_FALSE(def.probe.dump_module);
+  CHECK(def.probe.dump_file == "soulsframe_mem_dump.exe");
+
+  const auto valid = sf::parse_config_toml(R"(
+    [probe]
+    dump_module = true
+    dump_file = "ds3_dump.exe"
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.probe.dump_module);
+  CHECK(valid.config.probe.dump_file == "ds3_dump.exe");
+
+  const auto bad = sf::parse_config_toml(R"(
+    [probe]
+    dump_module = "bad"
+    dump_file = "../evil.exe"
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK_FALSE(bad.config.probe.dump_module);
+  CHECK(bad.config.probe.dump_file == "soulsframe_mem_dump.exe");
+  CHECK(bad.warnings.size() == 2);
+}

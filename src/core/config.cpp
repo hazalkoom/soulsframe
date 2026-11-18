@@ -58,6 +58,19 @@ void read_clamped_u32(const toml::table& tbl, std::string_view key, std::string_
   }
 }
 
+void read_safe_filename(const toml::table& tbl, std::string_view key, std::string_view full_name,
+                        std::string& target, std::vector<std::string>& warnings) {
+  if (auto v = tbl[key].value<std::string>()) {
+    if (v->empty() || v->find("..") != std::string::npos) {
+      warnings.emplace_back(std::string(full_name) + " invalid or unsafe; using default");
+    } else {
+      target = *v;
+    }
+  } else if (tbl.contains(key)) {
+    warnings.emplace_back(std::string(full_name) + " must be string; using default");
+  }
+}
+
 } // namespace
 
 ConfigParseResult parse_config_toml(std::string_view toml_text) {
@@ -146,8 +159,9 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* prb = root["probe"].as_table()) {
-    constexpr std::array<std::string_view, 4> kProbeKeys = {"capture_frames", "output_file",
-                                                            "trace_resources", "gpu_timing"};
+    constexpr std::array<std::string_view, 6> kProbeKeys = {"capture_frames",  "output_file",
+                                                            "trace_resources", "gpu_timing",
+                                                            "dump_module",     "dump_file"};
     warn_unknown_keys(*prb, "probe.", kProbeKeys, out.warnings);
 
     read_clamped_u32(*prb, "capture_frames", "probe.capture_frames", 1U, 36000U,
@@ -156,16 +170,12 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                   out.config.probe.trace_resources, out.warnings);
     read_bool_key(*prb, "gpu_timing", "probe.gpu_timing", out.config.probe.gpu_timing,
                   out.warnings);
-
-    if (auto v = (*prb)["output_file"].value<std::string>()) {
-      if (v->empty() || v->find("..") != std::string::npos) {
-        out.warnings.emplace_back("probe.output_file invalid or unsafe; using default");
-      } else {
-        out.config.probe.output_file = *v;
-      }
-    } else if (prb->contains("output_file")) {
-      out.warnings.emplace_back("probe.output_file must be string; using default");
-    }
+    read_bool_key(*prb, "dump_module", "probe.dump_module", out.config.probe.dump_module,
+                  out.warnings);
+    read_safe_filename(*prb, "output_file", "probe.output_file", out.config.probe.output_file,
+                       out.warnings);
+    read_safe_filename(*prb, "dump_file", "probe.dump_file", out.config.probe.dump_file,
+                       out.warnings);
   }
 
   return out;

@@ -55,6 +55,13 @@ struct Config {
     /// Measure per-pass and per-frame GPU time with D3D11 timestamp queries (M3). Kill switch:
     /// set false if a driver misbehaves with queries; capture then omits `gpu_ms` fields.
     bool gpu_timing = true;
+
+    /// Dump a read-only, Ghidra-aligned copy of the host executable from memory once at startup
+    /// (M4 RE helper). Off by default; never writes or alters game memory.
+    bool dump_module = false;
+
+    /// Filename written alongside `dinput8.dll` when `dump_module = true`.
+    std::string dump_file = "soulsframe_mem_dump.exe";
   } probe;
 
   /// Returns a `Config` populated with safe, conservative defaults.
