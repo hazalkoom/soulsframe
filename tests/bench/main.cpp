@@ -3,6 +3,7 @@
 #include "probe/jsonl_writer.h"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -12,12 +13,14 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace {
 
 struct CliOptions {
   bool quick = false;
+  uint64_t fixed_iterations = 0;
   std::string filter;
   std::string json_path;
 };
@@ -32,15 +35,25 @@ CliOptions parse_cli(int argc, char** argv) {
       opts.filter = argv[++i];
     } else if (arg == "--json" && i + 1 < argc) {
       opts.json_path = argv[++i];
+    } else if (arg == "--iterations" && i + 1 < argc) {
+      const std::string_view value(argv[++i]);
+      uint64_t parsed = 0;
+      const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+      if (ec == std::errc{} && ptr == value.data() + value.size() && parsed > 0) {
+        opts.fixed_iterations = parsed;
+      }
     }
   }
   return opts;
 }
 
-sf::bench::BenchResult run_case(const sf::bench::BenchCase& bc, bool quick) {
+sf::bench::BenchResult run_case(const sf::bench::BenchCase& bc, bool quick,
+                                uint64_t fixed_iterations) {
   using Clock = std::chrono::steady_clock;
 
-  const uint64_t iters = quick ? std::max<uint64_t>(1, bc.iterations / 100) : bc.iterations;
+  const uint64_t iters = fixed_iterations > 0
+                             ? fixed_iterations
+                             : (quick ? std::max<uint64_t>(1, bc.iterations / 100) : bc.iterations);
   const size_t warmup_runs = quick ? 1U : 2U;
   const size_t measured_runs = quick ? 2U : 5U;
 
@@ -149,7 +162,7 @@ int main(int argc, char** argv) {
         bc.category.find(opts.filter) == std::string_view::npos) {
       continue;
     }
-    results.push_back(run_case(bc, opts.quick));
+    results.push_back(run_case(bc, opts.quick, opts.fixed_iterations));
   }
 
   print_table(results);

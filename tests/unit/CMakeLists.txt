@@ -8,6 +8,7 @@ add_executable(soulsframe_unit_tests
   test_module_registry.cpp
   test_offline_guard.cpp
   test_pe_dump.cpp
+  test_pgo_script.cpp
   test_probe_trace.cpp
   test_profile.cpp
   test_security_inputs.cpp
