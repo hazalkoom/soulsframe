@@ -33,6 +33,7 @@ jobs:
         with:
           languages: c-cpp
           queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build host targets for CodeQL tracing
         run: |

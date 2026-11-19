@@ -1,0 +1,6 @@
+name: "SoulsFrame CodeQL Configuration"
+
+# Ignore CMake build outputs and downloaded third-party FetchContent headers
+# (e.g. build/_deps/doctest-src) while scanning all first-party source code.
+paths-ignore:
+  - "build/**"

@@ -7,17 +7,46 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace {
 
-std::optional<std::vector<std::byte>> read_binary_file(const std::string& path) {
+/// Validates a user-supplied CLI path, rejecting empty strings, embedded NULs,
+/// and parent-directory traversal (`..`) components before filesystem access.
+std::optional<std::filesystem::path> validate_cli_path(std::string_view raw,
+                                                       bool require_existing_file) {
+  if (raw.empty() || raw.find('\0') != std::string_view::npos ||
+      raw.find("..") != std::string_view::npos) {
+    return std::nullopt;
+  }
+
+  const std::filesystem::path p(raw);
+  for (const auto& part : p) {
+    if (part == "..") {
+      return std::nullopt;
+    }
+  }
+
+  std::error_code ec;
+  const std::filesystem::path normalized = std::filesystem::weakly_canonical(p, ec);
+  if (ec || normalized.empty()) {
+    return std::nullopt;
+  }
+  if (require_existing_file && !std::filesystem::is_regular_file(normalized, ec)) {
+    return std::nullopt;
+  }
+  return normalized;
+}
+
+std::optional<std::vector<std::byte>> read_binary_file(const std::filesystem::path& path) {
   std::ifstream ifs(path, std::ios::binary | std::ios::ate);
   if (!ifs.is_open()) {
     return std::nullopt;
@@ -74,12 +103,17 @@ int cmd_builds_hash(int argc, char** argv) {
     std::cerr << "Usage: sftool builds hash <file>\n";
     return 2;
   }
-  const auto data = read_binary_file(argv[3]);
-  if (!data) {
-    std::cerr << "Failed to read file: " << argv[3] << '\n';
+  const auto in_path = validate_cli_path(argv[3], true);
+  if (!in_path) {
+    std::cerr << "Invalid or unreadable file path: " << argv[3] << '\n';
     return 1;
   }
-  std::cout << sf::sha256_hex(*data) << "  " << argv[3] << '\n';
+  const auto data = read_binary_file(*in_path);
+  if (!data) {
+    std::cerr << "Failed to read file: " << in_path->string() << '\n';
+    return 1;
+  }
+  std::cout << sf::sha256_hex(*data) << "  " << in_path->string() << '\n';
   return 0;
 }
 
@@ -88,9 +122,14 @@ int cmd_pe_info(int argc, char** argv) {
     std::cerr << "Usage: sftool pe-info <file>\n";
     return 2;
   }
-  const auto data = read_binary_file(argv[2]);
+  const auto in_path = validate_cli_path(argv[2], true);
+  if (!in_path) {
+    std::cerr << "Invalid or unreadable file path: " << argv[2] << '\n';
+    return 1;
+  }
+  const auto data = read_binary_file(*in_path);
   if (!data) {
-    std::cerr << "Failed to read file: " << argv[2] << '\n';
+    std::cerr << "Failed to read file: " << in_path->string() << '\n';
     return 1;
   }
   const auto info = sf::probe::inspect_pe64(*data);
@@ -116,9 +155,15 @@ int cmd_pe_fixup(int argc, char** argv) {
     std::cerr << "Usage: sftool pe-fixup <in_dump> <out_pe> [runtime_base_hex]\n";
     return 2;
   }
-  auto data = read_binary_file(argv[2]);
+  const auto in_path = validate_cli_path(argv[2], true);
+  const auto out_path = validate_cli_path(argv[3], false);
+  if (!in_path || !out_path) {
+    std::cerr << "Invalid input or output path\n";
+    return 1;
+  }
+  auto data = read_binary_file(*in_path);
   if (!data) {
-    std::cerr << "Failed to read dump: " << argv[2] << '\n';
+    std::cerr << "Failed to read dump: " << in_path->string() << '\n';
     return 1;
   }
   uint64_t base = 0;
@@ -135,15 +180,15 @@ int cmd_pe_fixup(int argc, char** argv) {
     std::cerr << "PE fixup failed: " << res.error << '\n';
     return 1;
   }
-  std::ofstream ofs(argv[3], std::ios::binary | std::ios::trunc);
+  std::ofstream ofs(*out_path, std::ios::binary | std::ios::trunc);
   if (!ofs.is_open()) {
-    std::cerr << "Failed to open output file: " << argv[3] << '\n';
+    std::cerr << "Failed to open output file: " << out_path->string() << '\n';
     return 1;
   }
   ofs.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   std::cout << "Fixed " << res.sections_fixed << " sections (ImageBase=0x" << std::hex
-            << res.image_base << std::dec << ") -> " << argv[3] << '\n';
+            << res.image_base << std::dec << ") -> " << out_path->string() << '\n';
   return ofs.good() ? 0 : 1;
 }
 
@@ -167,8 +212,9 @@ int cmd_sigmaker(int argc, char** argv) {
     return 2;
   }
 
+  const auto valid_img = validate_cli_path(img_path, true);
   const auto rva_opt = parse_hex_u64(rva_str);
-  const auto data = read_binary_file(img_path);
+  const auto data = valid_img ? read_binary_file(*valid_img) : std::nullopt;
   if (!rva_opt || !data || *rva_opt >= data->size()) {
     std::cerr << "Invalid image or RVA out of bounds\n";
     return 1;
@@ -218,12 +264,18 @@ int cmd_sigtest(int argc, char** argv) {
     return 2;
   }
 
-  const auto data = read_binary_file(img_path);
-  if (!data) {
-    std::cerr << "Failed to read image: " << img_path << '\n';
+  const auto valid_img = validate_cli_path(img_path, true);
+  const auto valid_db = validate_cli_path(db_path, true);
+  if (!valid_img || !valid_db) {
+    std::cerr << "Invalid image or signature DB path\n";
     return 1;
   }
-  const auto db_res = sf::games::ds3::load_sig_db_file(db_path);
+  const auto data = read_binary_file(*valid_img);
+  if (!data) {
+    std::cerr << "Failed to read image: " << valid_img->string() << '\n';
+    return 1;
+  }
+  const auto db_res = sf::games::ds3::load_sig_db_file(valid_db->string());
   if (!db_res.parsed_ok) {
     for (const auto& w : db_res.warnings) {
       std::cerr << "DB warning: " << w << '\n';
