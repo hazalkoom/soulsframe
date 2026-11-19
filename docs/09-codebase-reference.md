@@ -1,4 +1,4 @@
-# 09. Codebase reference (M0–M4 RE foundation)
+# 09. Codebase reference (M0–M5 presentation)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -17,8 +17,10 @@ flowchart TD
   G -- allowed --> H["compute_host_exe_sha256() + resolve_profile()"]
   H --> I["ModuleRegistry::init_all(profile, cfg)"]
   I --> J["FrameTelemetryModule::init() -> install_swapchain_hooks()"]
+  I --> M["PresentationModule::init() -> FramePacer + CreateSwapChain flip hook"]
   I --> P["ProbeModule::init() [SF_PROBE=1] -> install_context_hooks()"]
   J --> K["hooked_present() ticks FrameStats & calls ModuleRegistry::on_present()"]
+  M --> K
   P --> L["hooked Draw*/Dispatch/Clear* -> TraceRecorder -> async JSONL writer thread"]
 ```
 
@@ -44,8 +46,10 @@ flowchart TD
 | [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features; uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
 | [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
 | [src/core/sha256.h](../src/core/sha256.h) / [.cpp](../src/core/sha256.cpp) | `sf::sha256_bytes()`, `sf::sha256_hex()` | Zero-dependency SHA-256 implementation for executable version pinning. |
+| [src/timing/frame_pacer.h](../src/timing/frame_pacer.h) / [.cpp](../src/timing/frame_pacer.cpp) | `sf::timing::IPacerClock`, `sf::timing::FramePacer`, `sf::timing::PacerStats` | Pure hybrid sleep+spin frame-rate limiter (`[present] max_fps`) with cadence preservation and hitch recovery. |
 | [src/timing/frame_stats.h](../src/timing/frame_stats.h) / [.cpp](../src/timing/frame_stats.cpp) | `sf::timing::IClock`, `sf::timing::FrameStats`, `sf::timing::FrameMetrics` | Rolling ring-buffer frame-time stats (avg, FPS, 1%/0.1% lows, >2x median spikes). |
 | [src/timing/gpu_timing.h](../src/timing/gpu_timing.h) / [.cpp](../src/timing/gpu_timing.cpp) | `sf::timing::gpu_ticks_to_ms()`, `resolve_gpu_frame()`, `GpuSlotRing` | Pure GPU-timestamp math (ticks to ms, N+1 stamps to N pass segments, rejects disjoint/zero-frequency/non-monotonic data) and the in-flight query slot ring. |
+| [src/timing/present_policy.h](../src/timing/present_policy.h) / [.cpp](../src/timing/present_policy.cpp) | `sf::timing::evaluate_flip_upgrade()`, `resolve_present_call()` | Pure DXGI flip-model compatibility policy (rejects MSAA/fullscreen/unsupported formats, computes `ALLOW_TEARING` flags safely). |
 | [src/probe/gpu_join.h](../src/probe/gpu_join.h) / [.cpp](../src/probe/gpu_join.cpp) | `sf::probe::GpuFrameJoiner`, `ReadyFrame` | Holds per-frame snapshots up to 8 frames until the late GPU result arrives, attaches `gpu_ms`, preserves frame order, times out lost queries. |
 | [src/tex/content_hash.h](../src/tex/content_hash.h) / [.cpp](../src/tex/content_hash.cpp) | `sf::tex::hash_bytes()`, `sf::tex::hash_hex()` | Fast 64-bit `XXH64` content hashing for future texture and shader registries. |
 | [src/hooks/sigscan.h](../src/hooks/sigscan.h) / [.cpp](../src/hooks/sigscan.cpp) | `sf::hooks::parse_pattern()`, `sf::hooks::sigscan()` | IDA-style byte-signature parser/scanner that refuses ambiguous multiple matches. |
@@ -62,6 +66,7 @@ flowchart TD
 | [src/core/proxy_dinput8.cpp](../src/core/proxy_dinput8.cpp) | `DirectInput8Create` | Exports `DirectInput8Create` and forwards calls to `%SystemRoot%\System32\dinput8.dll`. |
 | [src/core/log.h](../src/core/log.h) / [.cpp](../src/core/log.cpp) | `sf::log::init()`, `SF_LOG()`, `sf::log::module_dir()` | Thread-safe logger creating `soulsframe.log` alongside `dinput8.dll`. |
 | [src/core/win_helpers.h](../src/core/win_helpers.h) / [.cpp](../src/core/win_helpers.cpp) | `sf::WinClock`, `compute_host_exe_sha256()`, `detect_known_overlays()` | QPC monotonic clock, executable hashing, CLI tokenization, conflicting overlay detection. |
+| [src/gfx/d3d11/presentation_module.h](../src/gfx/d3d11/presentation_module.h) / [.cpp](../src/gfx/d3d11/presentation_module.cpp) | `sf::gfx::PresentationModule` | M5 presentation & pacing module: hooks `IDXGIFactory::CreateSwapChain` (slot 10) for safe `FLIP_DISCARD` upgrades with automatic fallback, and drives `FramePacer` + `ALLOW_TEARING` in `on_present()`. |
 | [src/gfx/d3d11/swapchain_hook.h](../src/gfx/d3d11/swapchain_hook.h) / [.cpp](../src/gfx/d3d11/swapchain_hook.cpp) | `install_swapchain_hooks()`, `hooked_present()`, `hooked_resize_buffers()` | Creates a dummy D3D11 device to resolve `IDXGISwapChain` vtable slots 8 & 13 and hooks them with MinHook. |
 | [src/gfx/d3d11/context_hook.h](../src/gfx/d3d11/context_hook.h) / [.cpp](../src/gfx/d3d11/context_hook.cpp) | `install_context_hooks()`, `remove_context_hooks()` | (`SF_PROBE=1` only) Hooks 7 `ID3D11DeviceContext` vtable slots (`DrawIndexed`, `Draw`, `DrawIndexedInstanced`, `DrawInstanced`, `Dispatch`, `ClearRenderTargetView`, `ClearDepthStencilView`), capturing RTV/blend/depth/shader/RVA state cleanly with COM reference counting and re-entrancy guards. |
 | [src/gfx/d3d11/gpu_timer.h](../src/gfx/d3d11/gpu_timer.h) / [.cpp](../src/gfx/d3d11/gpu_timer.cpp) | `sf::gfx::GpuTimer`, `GpuFrameResult` | (`SF_PROBE=1` only) D3D11 `TIMESTAMP`/`TIMESTAMP_DISJOINT` queries in an 8-slot ring: one stamp per pass start plus end of frame, polled with `DONOTFLUSH` so the GPU is never stalled; degrades to no `gpu_ms` if queries are unsupported. |

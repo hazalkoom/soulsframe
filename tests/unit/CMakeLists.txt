@@ -1,6 +1,7 @@
 add_executable(soulsframe_unit_tests
   test_config.cpp
   test_content_hash.cpp
+  test_frame_pacer.cpp
   test_frame_stats.cpp
   test_gpu_join.cpp
   test_gpu_timing.cpp
@@ -9,6 +10,7 @@ add_executable(soulsframe_unit_tests
   test_offline_guard.cpp
   test_pe_dump.cpp
   test_pgo_script.cpp
+  test_present_policy.cpp
   test_probe_trace.cpp
   test_profile.cpp
   test_security_inputs.cpp

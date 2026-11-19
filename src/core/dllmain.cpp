@@ -6,6 +6,7 @@
 #include "core/offline_guard.h"
 #include "core/win_helpers.h"
 #include "games/ds3/profile.h"
+#include "gfx/d3d11/presentation_module.h"
 #include "gfx/d3d11/swapchain_hook.h"
 
 #ifdef SF_PROBE
@@ -74,6 +75,7 @@ DWORD WINAPI init_thread(LPVOID) {
          profile.engine_hooks_allowed ? "true" : "false");
 
   g_registry.register_module(std::make_unique<FrameTelemetryModule>());
+  g_registry.register_module(std::make_unique<sf::gfx::PresentationModule>());
 #ifdef SF_PROBE
   g_registry.register_module(
       std::make_unique<sf::probe::ProbeModule>(sf::log::module_dir(g_self), exe_sha));

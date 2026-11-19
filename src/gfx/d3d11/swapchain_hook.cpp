@@ -51,12 +51,17 @@ HRESULT STDMETHODCALLTYPE hooked_present(IDXGISwapChain* sc, UINT sync_interval,
     }
   }
 
+  UINT effective_sync = sync_interval;
+  UINT effective_flags = flags;
   if (g_registry) {
-    PresentCtx ctx{frame, dt_ms, sc};
+    PresentCtx ctx{frame, dt_ms, sc, static_cast<uint32_t>(sync_interval),
+                   static_cast<uint32_t>(flags)};
     g_registry->on_present(ctx);
+    effective_sync = static_cast<UINT>(ctx.sync_interval);
+    effective_flags = static_cast<UINT>(ctx.present_flags);
   }
 
-  return g_orig_present(sc, sync_interval, flags);
+  return g_orig_present(sc, effective_sync, effective_flags);
 }
 
 /// Intercepts `IDXGISwapChain::ResizeBuffers` (slot 13) so future modules can

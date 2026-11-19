@@ -9,7 +9,7 @@ mod_enabled = true
 log_level = "info"
 
 [present]
-# "game" = leave swap chain as DS3 creates it; "flip" = planned M5 flip-model experiment
+# "game" = leave swap chain as DS3 creates it; "flip" = M5 FLIP_DISCARD upgrade (windowed, non-MSAA)
 mode = "game"
 max_fps = 0
 

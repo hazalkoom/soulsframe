@@ -67,6 +67,30 @@ grep -q "avg frame time" soulsframe.log
 grep -q "Swapchain hooks removed (total_frames=150)" soulsframe.log
 cp soulsframe.log soulsframe-msaa.log
 
+# Scenario 3b (M5): Presentation flip-model hook + 60 FPS hybrid frame pacer.
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[present]
+mode = "flip"
+max_fps = 60
+
+[modules]
+frame_telemetry = true
+presentation = true
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 30
+grep -q "Present hook installed" soulsframe.log
+grep -q "PresentationModule active (mode=flip, max_fps=60, flip_hook=on)" soulsframe.log
+grep -q "PresentationModule shutdown" soulsframe.log
+grep -q "Swapchain hooks removed (total_frames=30)" soulsframe.log
+cp soulsframe.log soulsframe-present.log
+
 SCENARIO_4_OK=false
 if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
   # Scenario 4: SF_PROBE draw-call tracer JSONL capture with alpha-blended particles.
@@ -117,6 +141,7 @@ cat > smoke-result.json <<EOF
   "scenario_1_offline_guard_blocked": true,
   "scenario_2_resize_300_frames_ok": true,
   "scenario_3_msaa_4x_150_frames_ok": true,
+  "scenario_3b_presentation_flip_pacer_ok": true,
   "scenario_4_probe_jsonl_capture_ok": ${SCENARIO_4_OK},
   "present_hook_installed": true,
   "resize_buffers_hooked": true,

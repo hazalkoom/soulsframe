@@ -43,10 +43,14 @@ pure_files=(
   src/probe/trace_types.cpp
   src/tex/content_hash.h
   src/tex/content_hash.cpp
+  src/timing/frame_pacer.h
+  src/timing/frame_pacer.cpp
   src/timing/frame_stats.h
   src/timing/frame_stats.cpp
   src/timing/gpu_timing.h
   src/timing/gpu_timing.cpp
+  src/timing/present_policy.h
+  src/timing/present_policy.cpp
 )
 
 for f in "${pure_files[@]}"; do

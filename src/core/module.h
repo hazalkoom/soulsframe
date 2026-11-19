@@ -17,6 +17,12 @@ struct PresentCtx {
 
   /// Opaque `IDXGISwapChain*` pointer kept untyped so `core/` has zero D3D11/DXGI deps.
   void* swap_chain = nullptr;
+
+  /// `Present` sync interval (0 = immediate, 1+ = vsync); modules may inspect or adjust it.
+  uint32_t sync_interval = 0;
+
+  /// `Present` flags bitmask (e.g. `DXGI_PRESENT_ALLOW_TEARING`); modules may adjust it.
+  uint32_t present_flags = 0;
 };
 
 /// Lifecycle interface implemented by every SoulsFrame subsystem (telemetry, pacing, FSR, etc.).

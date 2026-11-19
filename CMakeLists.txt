@@ -31,8 +31,10 @@ add_library(soulsframe_core STATIC
   src/games/ds3/sig_db.cpp
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
+  src/timing/frame_pacer.cpp
   src/timing/frame_stats.cpp
   src/timing/gpu_timing.cpp
+  src/timing/present_policy.cpp
 )
 target_include_directories(soulsframe_core PUBLIC src)
 target_compile_options(soulsframe_core PRIVATE ${SF_WARN_FLAGS})
@@ -67,6 +69,7 @@ if(NOT SF_HOST_ONLY)
     src/core/log.cpp
     src/core/proxy_dinput8.cpp
     src/core/win_helpers.cpp
+    src/gfx/d3d11/presentation_module.cpp
     src/gfx/d3d11/swapchain_hook.cpp
   )
   target_include_directories(soulsframe PRIVATE src)
@@ -80,6 +83,7 @@ if(NOT SF_HOST_ONLY)
     minhook
     d3d11
     dxgi
+    winmm
     -static
     -static-libgcc
     -static-libstdc++
