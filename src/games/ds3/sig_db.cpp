@@ -141,10 +141,20 @@ SigDbParseResult parse_sig_db_toml(std::string_view toml_text) {
           entry.offset = *o;
         }
         if (auto d = (*stbl)["disp_offset"].value<int64_t>(); d && *d >= 0) {
-          entry.disp_offset = static_cast<uint32_t>(*d);
+          if (*d <= 0xFFFFLL) {
+            entry.disp_offset = static_cast<uint32_t>(*d);
+          } else {
+            out.warnings.emplace_back("Signature '" + entry.name +
+                                      "' disp_offset out of range; using default");
+          }
         }
         if (auto l = (*stbl)["insn_len"].value<int64_t>(); l && *l >= 4) {
-          entry.insn_len = static_cast<uint32_t>(*l);
+          if (*l <= 0xFFFFLL) {
+            entry.insn_len = static_cast<uint32_t>(*l);
+          } else {
+            out.warnings.emplace_back("Signature '" + entry.name +
+                                      "' insn_len out of range; using default");
+          }
         }
         if (auto k = (*stbl)["kind"].value<std::string>()) {
           entry.kind = parse_kind(*k, out.warnings, entry.name);

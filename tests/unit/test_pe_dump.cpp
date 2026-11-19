@@ -128,3 +128,53 @@ TEST_CASE("pe_dump rejects malformed headers, 32-bit PE32, and truncated buffers
   auto fix_err = sf::probe::fixup_pe_dump_for_ghidra(bad_mz);
   CHECK_FALSE(fix_err.ok);
 }
+
+TEST_CASE("pe_dump rejects progressively truncated DOS and NT headers") {
+  const auto pe = make_synthetic_pe64();
+
+  std::vector<std::byte> too_small_dos(pe.begin(), pe.begin() + 32);
+  const auto short_dos = sf::probe::inspect_pe64(too_small_dos);
+  CHECK_FALSE(short_dos.valid);
+  CHECK(short_dos.error == "buffer smaller than DOS header");
+
+  std::vector<std::byte> dos_only(pe.begin(), pe.begin() + 64);
+  const auto no_lfanew = sf::probe::inspect_pe64(dos_only);
+  CHECK_FALSE(no_lfanew.valid);
+
+  std::vector<std::byte> dos_header_only(pe.begin(), pe.begin() + 0x40);
+  put_u32(dos_header_only, 0x3C, 0xFFFFFF00U);
+  const auto corrupt_lfanew = sf::probe::inspect_pe64(dos_header_only);
+  CHECK_FALSE(corrupt_lfanew.valid);
+  CHECK(corrupt_lfanew.error == "PE header offset out of bounds");
+
+  std::vector<std::byte> nt_truncated(pe.begin(), pe.begin() + 0x90);
+  put_u32(nt_truncated, 0x3C, 0x80);
+  const auto short_nt = sf::probe::inspect_pe64(nt_truncated);
+  CHECK_FALSE(short_nt.valid);
+  CHECK(short_nt.error == "PE header offset out of bounds");
+
+  std::vector<std::byte> section_truncated(pe.begin(), pe.begin() + 0x180);
+  const auto short_sections = sf::probe::inspect_pe64(section_truncated);
+  CHECK_FALSE(short_sections.valid);
+  CHECK_FALSE(short_sections.error.empty());
+
+  const auto fix_err = sf::probe::fixup_pe_dump_for_ghidra(section_truncated);
+  CHECK_FALSE(fix_err.ok);
+}
+
+TEST_CASE("pe_dump rejects corrupted e_lfanew values with exact bounds checks") {
+  for (const uint32_t corrupt_lfanew :
+       {uint32_t{0}, uint32_t{0x40}, uint32_t{0x1000}, uint32_t{0xFFFF'FFF0U}}) {
+    auto pe = make_synthetic_pe64();
+    put_u32(pe, 0x3C, corrupt_lfanew);
+    const auto info = sf::probe::inspect_pe64(pe);
+    CHECK_FALSE(info.valid);
+    CHECK_FALSE(info.error.empty());
+  }
+
+  auto pe = make_synthetic_pe64();
+  pe.resize(0x3F);
+  const auto short_dos = sf::probe::inspect_pe64(pe);
+  CHECK_FALSE(short_dos.valid);
+  CHECK(short_dos.error == "buffer smaller than DOS header");
+}

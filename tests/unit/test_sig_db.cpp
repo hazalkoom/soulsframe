@@ -156,3 +156,89 @@ confidence = "fake"
   const auto missing = sf::games::ds3::load_sig_db_file("/nonexistent/ds3_sigs_missing.toml");
   CHECK_FALSE(missing.parsed_ok);
 }
+
+TEST_CASE("sig_db rejects missing fields, invalid hex pairs, and out-of-range numeric fields") {
+  using namespace sf::games::ds3;
+
+  const auto missing_fields = parse_sig_db_toml(R"(
+[build."0123456789abcdef"]
+verified = false
+
+[[build."0123456789abcdef".sig]]
+name = "missing_pattern"
+
+[[build."0123456789abcdef".sig]]
+pattern = "48 8B 05"
+name = ""
+
+[[build."0123456789abcdef".sig]]
+name = "bad_hex"
+pattern = "48 8G 05"
+)");
+  CHECK(missing_fields.parsed_ok);
+  CHECK_FALSE(missing_fields.warnings.empty());
+  const auto* missing_build = missing_fields.db.find_build("0123456789abcdef");
+  REQUIRE(missing_build != nullptr);
+  CHECK(missing_build->signatures.empty());
+
+  const auto numeric_bounds = parse_sig_db_toml(R"(
+[build."fedcba9876543210"]
+verified = false
+
+[[build."fedcba9876543210".sig]]
+name = "bounds"
+pattern = "48 8B 05"
+disp_offset = 100000
+insn_len = 100000
+)");
+  CHECK(numeric_bounds.parsed_ok);
+  CHECK_FALSE(numeric_bounds.warnings.empty());
+  const auto* bounds_build = numeric_bounds.db.find_build("fedcba9876543210");
+  REQUIRE(bounds_build != nullptr);
+  REQUIRE(bounds_build->signatures.size() == 1);
+  CHECK(bounds_build->signatures[0].disp_offset == 3U);
+  CHECK(bounds_build->signatures[0].insn_len == 7U);
+
+  const auto negative_bounds = parse_sig_db_toml(R"(
+[build."aabbccdd"]
+verified = false
+
+[[build."aabbccdd".sig]]
+name = "negative"
+pattern = "48 8B 05"
+disp_offset = -4
+insn_len = 2
+)");
+  CHECK(negative_bounds.parsed_ok);
+  const auto* negative_build = negative_bounds.db.find_build("aabbccdd");
+  REQUIRE(negative_build != nullptr);
+  REQUIRE(negative_build->signatures.size() == 1);
+  CHECK(negative_build->signatures[0].disp_offset == 3U);
+  CHECK(negative_build->signatures[0].insn_len == 7U);
+}
+
+TEST_CASE("sig_db resolves targets with extreme offsets and RIP lengths safely") {
+  using namespace sf::games::ds3;
+
+  std::vector<std::byte> img(16, std::byte{0x90});
+
+  SignatureEntry entry{};
+  entry.name = "extreme";
+  entry.pattern = "90";
+  entry.offset = 0x7FFF'FFFF'FFFF'FFFFLL;
+  const auto huge_offset = resolve_signature_target(img, 0x140000000ULL, entry);
+  CHECK_FALSE(huge_offset.status == ResolveStatus::Resolved);
+
+  entry.kind = SigKind::RipRelData;
+  entry.offset = 0;
+  entry.disp_offset = 0xFFFFU;
+  entry.insn_len = 0xFFFFU;
+  const auto huge_rip = resolve_signature_target(img, 0x140000000ULL, entry);
+  CHECK_FALSE(huge_rip.status == ResolveStatus::Resolved);
+
+  entry.disp_offset = 0;
+  entry.insn_len = 8;
+  entry.offset = 500;
+  const auto out_of_range = resolve_signature_target(img, 0x140000000ULL, entry);
+  CHECK_FALSE(out_of_range.status == ResolveStatus::Resolved);
+}
