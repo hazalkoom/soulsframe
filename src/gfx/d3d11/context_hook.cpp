@@ -1,6 +1,7 @@
 #include "gfx/d3d11/context_hook.h"
 
 #include "core/log.h"
+#include "gfx/d3d11/particle_module.h"
 
 #include <MinHook.h>
 #include <d3d11.h>
@@ -278,31 +279,56 @@ void maybe_record_clear(ID3D11DeviceContext* ctx, probe::DrawApi api, ID3D11View
 
 void STDMETHODCALLTYPE hooked_draw_indexed(ID3D11DeviceContext* ctx, UINT index_count,
                                            UINT start_index, INT base_vertex) {
+  const auto decision = filter_d3d11_draw(ctx, static_cast<uint32_t>(index_count), 1U, false);
+  if (decision.skip_draw) {
+    return;
+  }
   maybe_record_draw(ctx, probe::DrawApi::DrawIndexed, index_count, 1, __builtin_return_address(0));
   g_orig_draw_indexed(ctx, index_count, start_index, base_vertex);
+  finish_d3d11_draw(ctx, decision);
 }
 
 void STDMETHODCALLTYPE hooked_draw(ID3D11DeviceContext* ctx, UINT vertex_count, UINT start_vertex) {
+  const auto decision = filter_d3d11_draw(ctx, static_cast<uint32_t>(vertex_count), 1U, false);
+  if (decision.skip_draw) {
+    return;
+  }
   maybe_record_draw(ctx, probe::DrawApi::Draw, vertex_count, 1, __builtin_return_address(0));
   g_orig_draw(ctx, vertex_count, start_vertex);
+  finish_d3d11_draw(ctx, decision);
 }
 
 void STDMETHODCALLTYPE hooked_draw_indexed_instanced(ID3D11DeviceContext* ctx,
                                                      UINT index_count_per_inst, UINT instance_count,
                                                      UINT start_index, INT base_vertex,
                                                      UINT start_instance) {
-  maybe_record_draw(ctx, probe::DrawApi::DrawIndexedInstanced, index_count_per_inst, instance_count,
-                    __builtin_return_address(0));
-  g_orig_draw_indexed_instanced(ctx, index_count_per_inst, instance_count, start_index, base_vertex,
-                                start_instance);
+  const auto decision = filter_d3d11_draw(ctx, static_cast<uint32_t>(index_count_per_inst),
+                                          static_cast<uint32_t>(instance_count), true);
+  if (decision.skip_draw) {
+    return;
+  }
+  const UINT effective_instances = static_cast<UINT>(decision.effective_instance_count);
+  maybe_record_draw(ctx, probe::DrawApi::DrawIndexedInstanced, index_count_per_inst,
+                    effective_instances, __builtin_return_address(0));
+  g_orig_draw_indexed_instanced(ctx, index_count_per_inst, effective_instances, start_index,
+                                base_vertex, start_instance);
+  finish_d3d11_draw(ctx, decision);
 }
 
 void STDMETHODCALLTYPE hooked_draw_instanced(ID3D11DeviceContext* ctx, UINT vertex_count_per_inst,
                                              UINT instance_count, UINT start_vertex,
                                              UINT start_instance) {
-  maybe_record_draw(ctx, probe::DrawApi::DrawInstanced, vertex_count_per_inst, instance_count,
+  const auto decision = filter_d3d11_draw(ctx, static_cast<uint32_t>(vertex_count_per_inst),
+                                          static_cast<uint32_t>(instance_count), true);
+  if (decision.skip_draw) {
+    return;
+  }
+  const UINT effective_instances = static_cast<UINT>(decision.effective_instance_count);
+  maybe_record_draw(ctx, probe::DrawApi::DrawInstanced, vertex_count_per_inst, effective_instances,
                     __builtin_return_address(0));
-  g_orig_draw_instanced(ctx, vertex_count_per_inst, instance_count, start_vertex, start_instance);
+  g_orig_draw_instanced(ctx, vertex_count_per_inst, effective_instances, start_vertex,
+                        start_instance);
+  finish_d3d11_draw(ctx, decision);
 }
 
 void STDMETHODCALLTYPE hooked_dispatch(ID3D11DeviceContext* ctx, UINT x, UINT y, UINT z) {

@@ -10,6 +10,9 @@ namespace sf {
 /// Game-specific D3D11 pass detection heuristics forwarded to `gfx/d3d11/`.
 struct RenderProfile {
   bool detect_particles_by_blend = true;
+  bool require_depth_read_only = true;
+  uint8_t required_rtv_count = 1;
+  uint32_t min_rt_dimension = 128;
 };
 
 /// Resolved capability table for a host executable build.

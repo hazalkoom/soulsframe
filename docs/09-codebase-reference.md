@@ -1,4 +1,4 @@
-# 09. Codebase reference (M0–M5 presentation)
+# 09. Codebase reference (M0–M7 render scale & FSR 1)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -18,9 +18,13 @@ flowchart TD
   H --> I["ModuleRegistry::init_all(profile, cfg)"]
   I --> J["FrameTelemetryModule::init() -> install_swapchain_hooks()"]
   I --> M["PresentationModule::init() -> FramePacer + CreateSwapChain flip hook"]
+  I --> N["ParticleModule::init() -> ID3D11DeviceContext draw filter & viewport scale"]
+  I --> U["UpscalerModule::init() -> D3DCompile FSR1/RCAS pass on Present()"]
   I --> P["ProbeModule::init() [SF_PROBE=1] -> install_context_hooks()"]
   J --> K["hooked_present() ticks FrameStats & calls ModuleRegistry::on_present()"]
   M --> K
+  U --> K
+  N --> L
   P --> L["hooked Draw*/Dispatch/Clear* -> TraceRecorder -> async JSONL writer thread"]
 ```
 
@@ -53,7 +57,9 @@ flowchart TD
 | [src/probe/gpu_join.h](../src/probe/gpu_join.h) / [.cpp](../src/probe/gpu_join.cpp) | `sf::probe::GpuFrameJoiner`, `ReadyFrame` | Holds per-frame snapshots up to 8 frames until the late GPU result arrives, attaches `gpu_ms`, preserves frame order, times out lost queries. |
 | [src/tex/content_hash.h](../src/tex/content_hash.h) / [.cpp](../src/tex/content_hash.cpp) | `sf::tex::hash_bytes()`, `sf::tex::hash_hex()` | Fast 64-bit `XXH64` content hashing for future texture and shader registries. |
 | [src/hooks/sigscan.h](../src/hooks/sigscan.h) / [.cpp](../src/hooks/sigscan.cpp) | `sf::hooks::parse_pattern()`, `sf::hooks::sigscan()` | IDA-style byte-signature parser/scanner that refuses ambiguous multiple matches. |
-| [src/games/ds3/profile.h](../src/games/ds3/profile.h) / [.cpp](../src/games/ds3/profile.cpp) | `sf::GameProfile`, `sf::games::ds3::resolve_profile()` | Build-hash lookup; unknown hashes disable engine hooks while keeping telemetry active. |
+| [src/games/ds3/profile.h](../src/games/ds3/profile.h) / [.cpp](../src/games/ds3/profile.cpp) | `sf::GameProfile`, `sf::RenderProfile`, `sf::games::ds3::resolve_profile()` | Build-hash lookup and DS3 render heuristics; unknown hashes disable engine hooks while keeping telemetry active. |
+| [src/games/ds3/render.h](../src/games/ds3/render.h) / [.cpp](../src/games/ds3/render.cpp) | `sf::games::ds3::is_particle_draw()`, `compute_low_res_viewport()`, `ParticlePassPolicy` | Pure M6 DS3 alpha/additive particle detection, low-res viewport scaling, and draw/instance budget policy. |
+| [src/gfx/fx/fsr1_math.h](../src/gfx/fx/fsr1_math.h) / [.cpp](../src/gfx/fx/fsr1_math.cpp) | `sf::gfx::fx::resolve_preset_scale_percent()`, `compute_upscale_dimensions()`, `compute_easu_constants()`, `compute_rcas_constants()` | Pure M7 FSR 1 render-scale preset resolution and EASU/RCAS GPU constant computation. |
 | [src/games/ds3/sig_db.h](../src/games/ds3/sig_db.h) / [.cpp](../src/games/ds3/sig_db.cpp) | `sf::games::ds3::parse_sig_db_toml()`, `resolve_signature_target()` | SHA-256 keyed `ds3_sigs.toml` loader and strict unique pattern + x64 `[rip + disp32]` resolver. |
 | [src/probe/pe_dump.h](../src/probe/pe_dump.h) / [.cpp](../src/probe/pe_dump.cpp) | `sf::probe::inspect_pe64()`, `fixup_pe_dump_for_ghidra()` | Pure PE32+ parser and unaligned runtime dump section fixer for headless Ghidra. |
 | [src/probe/trace_types.h](../src/probe/trace_types.h) / [.cpp](../src/probe/trace_types.cpp) | `sf::probe::TraceRecorder`, `DrawCallState`, `classify_pass()`, `PassSummary`, `CallSiteStats` | Pure-C++ M2 draw-call aggregator, pass-boundary detector, resource deduplicator, and heuristic pass classifier (`particles_alpha`, `gbuffer`, `shadow`, etc.). |
@@ -66,7 +72,9 @@ flowchart TD
 | [src/core/proxy_dinput8.cpp](../src/core/proxy_dinput8.cpp) | `DirectInput8Create` | Exports `DirectInput8Create` and forwards calls to `%SystemRoot%\System32\dinput8.dll`. |
 | [src/core/log.h](../src/core/log.h) / [.cpp](../src/core/log.cpp) | `sf::log::init()`, `SF_LOG()`, `sf::log::module_dir()` | Thread-safe logger creating `soulsframe.log` alongside `dinput8.dll`. |
 | [src/core/win_helpers.h](../src/core/win_helpers.h) / [.cpp](../src/core/win_helpers.cpp) | `sf::WinClock`, `compute_host_exe_sha256()`, `detect_known_overlays()` | QPC monotonic clock, executable hashing, CLI tokenization, conflicting overlay detection. |
+| [src/gfx/d3d11/particle_module.h](../src/gfx/d3d11/particle_module.h) / [.cpp](../src/gfx/d3d11/particle_module.cpp) | `sf::gfx::ParticleModule`, `filter_d3d11_draw()`, `finish_d3d11_draw()` | M6 particle mitigation module: detects DS3 read-only-depth blended draws, caps overdraw/instance budgets, and applies temporary low-res viewport scaling (cooperates seamlessly with `SF_PROBE` hooks). |
 | [src/gfx/d3d11/presentation_module.h](../src/gfx/d3d11/presentation_module.h) / [.cpp](../src/gfx/d3d11/presentation_module.cpp) | `sf::gfx::PresentationModule` | M5 presentation & pacing module: hooks `IDXGIFactory::CreateSwapChain` (slot 10) for safe `FLIP_DISCARD` upgrades with automatic fallback, and drives `FramePacer` + `ALLOW_TEARING` in `on_present()`. |
+| [src/gfx/d3d11/upscaler_module.h](../src/gfx/d3d11/upscaler_module.h) / [.cpp](../src/gfx/d3d11/upscaler_module.cpp) | `sf::gfx::UpscalerModule` | M7 spatial upscaler & RCAS sharpening module (`[modules] upscaler`, `[upscaler]`): compiles SM 4.0 fullscreen VS+PS via `D3DCompile` at runtime and executes on non-MSAA back buffers. |
 | [src/gfx/d3d11/swapchain_hook.h](../src/gfx/d3d11/swapchain_hook.h) / [.cpp](../src/gfx/d3d11/swapchain_hook.cpp) | `install_swapchain_hooks()`, `hooked_present()`, `hooked_resize_buffers()` | Creates a dummy D3D11 device to resolve `IDXGISwapChain` vtable slots 8 & 13 and hooks them with MinHook. |
 | [src/gfx/d3d11/context_hook.h](../src/gfx/d3d11/context_hook.h) / [.cpp](../src/gfx/d3d11/context_hook.cpp) | `install_context_hooks()`, `remove_context_hooks()` | (`SF_PROBE=1` only) Hooks 7 `ID3D11DeviceContext` vtable slots (`DrawIndexed`, `Draw`, `DrawIndexedInstanced`, `DrawInstanced`, `Dispatch`, `ClearRenderTargetView`, `ClearDepthStencilView`), capturing RTV/blend/depth/shader/RVA state cleanly with COM reference counting and re-entrancy guards. |
 | [src/gfx/d3d11/gpu_timer.h](../src/gfx/d3d11/gpu_timer.h) / [.cpp](../src/gfx/d3d11/gpu_timer.cpp) | `sf::gfx::GpuTimer`, `GpuFrameResult` | (`SF_PROBE=1` only) D3D11 `TIMESTAMP`/`TIMESTAMP_DISJOINT` queries in an 8-slot ring: one stamp per pass start plus end of frame, polled with `DONOTFLUSH` so the GPU is never stalled; degrades to no `gpu_ms` if queries are unsupported. |

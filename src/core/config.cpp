@@ -103,7 +103,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     return out;
   }
 
-  constexpr std::array<std::string_view, 4> kRootKeys = {"general", "present", "modules", "probe"};
+  constexpr std::array<std::string_view, 6> kRootKeys = {"general", "present",   "modules",
+                                                         "probe",   "particles", "upscaler"};
   warn_unknown_keys(root, "", kRootKeys, out.warnings);
 
   if (auto* gen = root["general"].as_table()) {
@@ -146,8 +147,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* mods = root["modules"].as_table()) {
-    constexpr std::array<std::string_view, 3> kModKeys = {"frame_telemetry", "presentation",
-                                                          "probe_tracer"};
+    constexpr std::array<std::string_view, 5> kModKeys = {"frame_telemetry", "presentation",
+                                                          "probe_tracer", "particles", "upscaler"};
     warn_unknown_keys(*mods, "modules.", kModKeys, out.warnings);
 
     read_bool_key(*mods, "frame_telemetry", "modules.frame_telemetry",
@@ -156,6 +157,64 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                   out.warnings);
     read_bool_key(*mods, "probe_tracer", "modules.probe_tracer", out.config.modules.probe_tracer,
                   out.warnings);
+    read_bool_key(*mods, "particles", "modules.particles", out.config.modules.particles,
+                  out.warnings);
+    read_bool_key(*mods, "upscaler", "modules.upscaler", out.config.modules.upscaler, out.warnings);
+  }
+
+  if (auto* part = root["particles"].as_table()) {
+    constexpr std::array<std::string_view, 4> kParticleKeys = {
+        "mode", "scale_percent", "max_instances_per_draw", "max_draws_per_frame"};
+    warn_unknown_keys(*part, "particles.", kParticleKeys, out.warnings);
+
+    if (auto v = (*part)["mode"].value<std::string>()) {
+      if (*v == "auto" || *v == "throttle" || *v == "half_res") {
+        out.config.particles.mode = *v;
+      } else {
+        out.warnings.emplace_back("particles.mode invalid ('" + *v + "'); using 'auto'");
+      }
+    } else if (part->contains("mode")) {
+      out.warnings.emplace_back("particles.mode must be string; using default");
+    }
+
+    read_clamped_u32(*part, "scale_percent", "particles.scale_percent", 25U, 100U,
+                     out.config.particles.scale_percent, out.warnings);
+    read_clamped_u32(*part, "max_instances_per_draw", "particles.max_instances_per_draw", 0U, 4096U,
+                     out.config.particles.max_instances_per_draw, out.warnings);
+    read_clamped_u32(*part, "max_draws_per_frame", "particles.max_draws_per_frame", 0U, 16384U,
+                     out.config.particles.max_draws_per_frame, out.warnings);
+  }
+
+  if (auto* up = root["upscaler"].as_table()) {
+    constexpr std::array<std::string_view, 4> kUpscalerKeys = {"mode", "preset", "scale_percent",
+                                                               "sharpness_percent"};
+    warn_unknown_keys(*up, "upscaler.", kUpscalerKeys, out.warnings);
+
+    if (auto v = (*up)["mode"].value<std::string>()) {
+      if (*v == "none" || *v == "bilinear" || *v == "fsr1" || *v == "rcas_only") {
+        out.config.upscaler.mode = *v;
+      } else {
+        out.warnings.emplace_back("upscaler.mode invalid ('" + *v + "'); using 'fsr1'");
+      }
+    } else if (up->contains("mode")) {
+      out.warnings.emplace_back("upscaler.mode must be string; using default");
+    }
+
+    if (auto v = (*up)["preset"].value<std::string>()) {
+      if (*v == "native" || *v == "ultra_quality" || *v == "quality" || *v == "balanced" ||
+          *v == "performance" || *v == "custom") {
+        out.config.upscaler.preset = *v;
+      } else {
+        out.warnings.emplace_back("upscaler.preset invalid ('" + *v + "'); using 'custom'");
+      }
+    } else if (up->contains("preset")) {
+      out.warnings.emplace_back("upscaler.preset must be string; using default");
+    }
+
+    read_clamped_u32(*up, "scale_percent", "upscaler.scale_percent", 50U, 100U,
+                     out.config.upscaler.scale_percent, out.warnings);
+    read_clamped_u32(*up, "sharpness_percent", "upscaler.sharpness_percent", 0U, 100U,
+                     out.config.upscaler.sharpness_percent, out.warnings);
   }
 
   if (auto* prb = root["probe"].as_table()) {

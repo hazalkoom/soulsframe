@@ -28,7 +28,9 @@ add_library(soulsframe_core STATIC
   src/core/offline_guard.cpp
   src/core/sha256.cpp
   src/games/ds3/profile.cpp
+  src/games/ds3/render.cpp
   src/games/ds3/sig_db.cpp
+  src/gfx/fx/fsr1_math.cpp
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
   src/timing/frame_pacer.cpp
@@ -69,8 +71,10 @@ if(NOT SF_HOST_ONLY)
     src/core/log.cpp
     src/core/proxy_dinput8.cpp
     src/core/win_helpers.cpp
+    src/gfx/d3d11/particle_module.cpp
     src/gfx/d3d11/presentation_module.cpp
     src/gfx/d3d11/swapchain_hook.cpp
+    src/gfx/d3d11/upscaler_module.cpp
   )
   target_include_directories(soulsframe PRIVATE src)
   set_target_properties(soulsframe PROPERTIES

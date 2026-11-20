@@ -91,6 +91,56 @@ grep -q "PresentationModule shutdown" soulsframe.log
 grep -q "Swapchain hooks removed (total_frames=30)" soulsframe.log
 cp soulsframe.log soulsframe-present.log
 
+# Scenario 3c (M6): Particle pass mitigation (low-res viewport scaling + instance cap).
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+presentation = false
+particles = true
+
+[particles]
+mode = "auto"
+scale_percent = 50
+max_instances_per_draw = 4
+max_draws_per_frame = 0
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 30 --particles
+grep -q "ParticleModule active (mode=auto, scale_percent=50, max_instances=4" soulsframe.log
+grep -q "ParticleModule shutdown (frames=30, particle_draws=30, low_res=30, throttled=30, skipped=0, instances_culled=120" soulsframe.log
+cp soulsframe.log soulsframe-particles.log
+
+# Scenario 3d (M7): Spatial upscaler + RCAS pass on non-MSAA backbuffer.
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+presentation = false
+particles = false
+upscaler = true
+
+[upscaler]
+mode = "fsr1"
+preset = "ultra_quality"
+sharpness_percent = 80
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 20
+grep -q "UpscalerModule active (mode=fsr1, preset=ultra_quality, scale_percent=77, sharpness=80)" soulsframe.log
+grep -q "UpscalerModule shutdown (frames=20, easu_passes=20, rcas_passes=20" soulsframe.log
+cp soulsframe.log soulsframe-upscaler.log
+
 SCENARIO_4_OK=false
 if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
   # Scenario 4: SF_PROBE draw-call tracer JSONL capture with alpha-blended particles.
@@ -142,6 +192,8 @@ cat > smoke-result.json <<EOF
   "scenario_2_resize_300_frames_ok": true,
   "scenario_3_msaa_4x_150_frames_ok": true,
   "scenario_3b_presentation_flip_pacer_ok": true,
+  "scenario_3c_particles_mitigation_ok": true,
+  "scenario_3d_upscaler_fsr1_ok": true,
   "scenario_4_probe_jsonl_capture_ok": ${SCENARIO_4_OK},
   "present_hook_installed": true,
   "resize_buffers_hooked": true,

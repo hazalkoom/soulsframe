@@ -17,6 +17,23 @@ max_fps = 0
 frame_telemetry = true
 presentation = false
 probe_tracer = false
+particles = false
+upscaler = false
+
+[particles]
+# M6 particle overdraw mitigation: "auto", "throttle", or "half_res"
+mode = "auto"
+scale_percent = 50
+max_instances_per_draw = 0
+max_draws_per_frame = 0
+
+[upscaler]
+# M7 spatial upscaler & RCAS sharpener: "none", "bilinear", "fsr1", or "rcas_only"
+mode = "fsr1"
+# Preset: "native" (100%), "ultra_quality" (77%), "quality" (67%), "balanced" (59%), "performance" (50%), or "custom"
+preset = "ultra_quality"
+scale_percent = 77
+sharpness_percent = 80
 
 [probe]
 # Only used in SF_PROBE builds when modules.probe_tracer = true.

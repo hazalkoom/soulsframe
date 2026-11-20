@@ -39,7 +39,41 @@ struct Config {
     bool frame_telemetry = true;
     bool presentation = false;
     bool probe_tracer = false;
+    bool particles = false;
+    bool upscaler = false;
   } modules;
+
+  /// Milestone 6 particle pass mitigation and overdraw budget settings.
+  struct Particles {
+    /// Mitigation strategy: "auto" (low-res viewport/RT + instance budget),
+    /// "throttle" (instance/draw budget only), or "half_res" (low-res scaling).
+    std::string mode = "auto";
+
+    /// Resolution percentage for low-res particle passes (clamped to [25, 100], 50 = half-res).
+    uint32_t scale_percent = 50;
+
+    /// Maximum instances per instanced particle draw (0 = unlimited, clamped to [0, 4096]).
+    uint32_t max_instances_per_draw = 0;
+
+    /// Maximum particle draw calls per frame (0 = unlimited, clamped to [0, 16384]).
+    uint32_t max_draws_per_frame = 0;
+  } particles;
+
+  /// Milestone 7 spatial upscaling (FSR 1 EASU + RCAS) and internal render-scale settings.
+  struct Upscaler {
+    /// Upscaling pipeline mode: "none", "bilinear", "fsr1" (EASU + RCAS), or "rcas_only".
+    std::string mode = "fsr1";
+
+    /// Quality preset: "native" (100%), "ultra_quality" (77%), "quality" (67%),
+    /// "balanced" (59%), "performance" (50%), or "custom" (uses `scale_percent`).
+    std::string preset = "custom";
+
+    /// Internal render resolution percentage when `preset = "custom"` (clamped to [50, 100]).
+    uint32_t scale_percent = 77;
+
+    /// RCAS sharpening strength percentage (clamped to [0, 100], 80 = 0.4 stops attenuation).
+    uint32_t sharpness_percent = 80;
+  } upscaler;
 
   /// Settings for `SF_PROBE` draw-call and pass JSONL capture builds.
   struct Probe {

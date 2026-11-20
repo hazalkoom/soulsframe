@@ -231,3 +231,107 @@ TEST_CASE("probe.dump_module defaults off and dump_file blocks traversal") {
   CHECK(bad.config.probe.dump_file == "soulsframe_mem_dump.exe");
   CHECK(bad.warnings.size() == 2);
 }
+
+TEST_CASE("config validates [particles] settings, modes, and bounds") {
+  const auto def = sf::Config::defaults();
+  CHECK_FALSE(def.modules.particles);
+  CHECK(def.particles.mode == "auto");
+  CHECK(def.particles.scale_percent == 50U);
+  CHECK(def.particles.max_instances_per_draw == 0U);
+  CHECK(def.particles.max_draws_per_frame == 0U);
+
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    particles = true
+
+    [particles]
+    mode = "half_res"
+    scale_percent = 50
+    max_instances_per_draw = 128
+    max_draws_per_frame = 250
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.particles);
+  CHECK(valid.config.particles.mode == "half_res");
+  CHECK(valid.config.particles.scale_percent == 50U);
+  CHECK(valid.config.particles.max_instances_per_draw == 128U);
+  CHECK(valid.config.particles.max_draws_per_frame == 250U);
+
+  const auto throttle = sf::parse_config_toml(R"(
+    [particles]
+    mode = "throttle"
+    scale_percent = 10
+    max_instances_per_draw = 999999
+    max_draws_per_frame = -5
+  )");
+  CHECK(throttle.parsed_ok);
+  CHECK(throttle.config.particles.mode == "throttle");
+  CHECK(throttle.config.particles.scale_percent == 25U);
+  CHECK(throttle.config.particles.max_instances_per_draw == 4096U);
+  CHECK(throttle.config.particles.max_draws_per_frame == 0U);
+  CHECK(throttle.warnings.size() == 3);
+
+  const auto bad = sf::parse_config_toml(R"(
+    [particles]
+    mode = "bogus"
+    scale_percent = 200
+    unknown_field = 1
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.particles.mode == "auto");
+  CHECK(bad.config.particles.scale_percent == 100U);
+  CHECK(bad.warnings.size() == 3);
+}
+
+TEST_CASE("config validates [upscaler] modes, presets, and bounds") {
+  const auto def = sf::Config::defaults();
+  CHECK_FALSE(def.modules.upscaler);
+  CHECK(def.upscaler.mode == "fsr1");
+  CHECK(def.upscaler.preset == "custom");
+  CHECK(def.upscaler.scale_percent == 77U);
+  CHECK(def.upscaler.sharpness_percent == 80U);
+
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    upscaler = true
+
+    [upscaler]
+    mode = "fsr1"
+    preset = "quality"
+    scale_percent = 70
+    sharpness_percent = 90
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.upscaler);
+  CHECK(valid.config.upscaler.mode == "fsr1");
+  CHECK(valid.config.upscaler.preset == "quality");
+  CHECK(valid.config.upscaler.scale_percent == 70U);
+  CHECK(valid.config.upscaler.sharpness_percent == 90U);
+
+  const auto clamped = sf::parse_config_toml(R"(
+    [upscaler]
+    mode = "bilinear"
+    preset = "performance"
+    scale_percent = 10
+    sharpness_percent = 250
+  )");
+  CHECK(clamped.parsed_ok);
+  CHECK(clamped.config.upscaler.mode == "bilinear");
+  CHECK(clamped.config.upscaler.preset == "performance");
+  CHECK(clamped.config.upscaler.scale_percent == 50U);
+  CHECK(clamped.config.upscaler.sharpness_percent == 100U);
+  CHECK(clamped.warnings.size() == 2);
+
+  const auto bad = sf::parse_config_toml(R"(
+    [upscaler]
+    mode = "dlss_fake"
+    preset = "super_duper"
+    extra_key = 42
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.upscaler.mode == "fsr1");
+  CHECK(bad.config.upscaler.preset == "custom");
+  CHECK(bad.warnings.size() == 3);
+}
