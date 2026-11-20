@@ -41,6 +41,7 @@ struct Config {
     bool probe_tracer = false;
     bool particles = false;
     bool upscaler = false;
+    bool fps_unlock = false;
   } modules;
 
   /// Milestone 6 particle pass mitigation and overdraw budget settings.
@@ -74,6 +75,23 @@ struct Config {
     /// RCAS sharpening strength percentage (clamped to [0, 100], 80 = 0.4 stops attenuation).
     uint32_t sharpness_percent = 80;
   } upscaler;
+
+  /// Milestone 8 experimental high-refresh / fixed-step simulation timing settings.
+  struct FpsUnlock {
+    /// Timing integration strategy: "fixed_step" (60 Hz simulation accumulator + interpolation
+    /// alpha), "camera_only" (60 Hz world sim + high-rate camera dt), or "variable_dt"
+    /// (clamped variable delta-time experiment).
+    std::string strategy = "fixed_step";
+
+    /// Target unlocked presentation frame rate in FPS (clamped to [60, 360]).
+    uint32_t target_fps = 120;
+
+    /// Fixed simulation tick frequency in Hz (clamped to [30, 120], DS3 canonical = 60).
+    uint32_t sim_tick_hz = 60;
+
+    /// Maximum simulation substeps per render frame to prevent spiral-of-death stalls ([1, 8]).
+    uint32_t max_substeps = 4;
+  } fps_unlock;
 
   /// Settings for `SF_PROBE` draw-call and pass JSONL capture builds.
   struct Probe {

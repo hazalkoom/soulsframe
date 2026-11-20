@@ -47,6 +47,8 @@ pure_files=(
   src/probe/trace_types.cpp
   src/tex/content_hash.h
   src/tex/content_hash.cpp
+  src/timing/fixed_step.h
+  src/timing/fixed_step.cpp
   src/timing/frame_pacer.h
   src/timing/frame_pacer.cpp
   src/timing/frame_stats.h

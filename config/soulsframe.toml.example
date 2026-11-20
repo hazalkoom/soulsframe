@@ -19,6 +19,7 @@ presentation = false
 probe_tracer = false
 particles = false
 upscaler = false
+fps_unlock = false
 
 [particles]
 # M6 particle overdraw mitigation: "auto", "throttle", or "half_res"
@@ -34,6 +35,13 @@ mode = "fsr1"
 preset = "ultra_quality"
 scale_percent = 77
 sharpness_percent = 80
+
+[fps_unlock]
+# M8 experimental FPS unlock research: "fixed_step", "camera_only", or "variable_dt"
+strategy = "fixed_step"
+target_fps = 120
+sim_tick_hz = 60
+max_substeps = 4
 
 [probe]
 # Only used in SF_PROBE builds when modules.probe_tracer = true.

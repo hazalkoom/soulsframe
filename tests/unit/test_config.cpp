@@ -335,3 +335,53 @@ TEST_CASE("config validates [upscaler] modes, presets, and bounds") {
   CHECK(bad.config.upscaler.preset == "custom");
   CHECK(bad.warnings.size() == 3);
 }
+
+TEST_CASE("config validates [fps_unlock] strategies and bounds") {
+  const auto def = sf::Config::defaults();
+  CHECK_FALSE(def.modules.fps_unlock);
+  CHECK(def.fps_unlock.strategy == "fixed_step");
+  CHECK(def.fps_unlock.target_fps == 120U);
+  CHECK(def.fps_unlock.sim_tick_hz == 60U);
+  CHECK(def.fps_unlock.max_substeps == 4U);
+
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    fps_unlock = true
+
+    [fps_unlock]
+    strategy = "camera_only"
+    target_fps = 144
+    sim_tick_hz = 60
+    max_substeps = 6
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.fps_unlock);
+  CHECK(valid.config.fps_unlock.strategy == "camera_only");
+  CHECK(valid.config.fps_unlock.target_fps == 144U);
+  CHECK(valid.config.fps_unlock.sim_tick_hz == 60U);
+  CHECK(valid.config.fps_unlock.max_substeps == 6U);
+
+  const auto clamped = sf::parse_config_toml(R"(
+    [fps_unlock]
+    strategy = "variable_dt"
+    target_fps = 500
+    sim_tick_hz = 10
+    max_substeps = 99
+  )");
+  CHECK(clamped.parsed_ok);
+  CHECK(clamped.config.fps_unlock.strategy == "variable_dt");
+  CHECK(clamped.config.fps_unlock.target_fps == 360U);
+  CHECK(clamped.config.fps_unlock.sim_tick_hz == 30U);
+  CHECK(clamped.config.fps_unlock.max_substeps == 8U);
+  CHECK(clamped.warnings.size() == 3);
+
+  const auto bad = sf::parse_config_toml(R"(
+    [fps_unlock]
+    strategy = "invalid_strat"
+    extra_key = true
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.fps_unlock.strategy == "fixed_step");
+  CHECK(bad.warnings.size() == 2);
+}

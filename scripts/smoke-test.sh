@@ -141,6 +141,33 @@ grep -q "UpscalerModule active (mode=fsr1, preset=ultra_quality, scale_percent=7
 grep -q "UpscalerModule shutdown (frames=20, easu_passes=20, rcas_passes=20" soulsframe.log
 cp soulsframe.log soulsframe-upscaler.log
 
+# Scenario 3e (M8): Experimental fixed-step FPS unlock accumulator in safe dry-run mode.
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+presentation = false
+particles = false
+upscaler = false
+fps_unlock = true
+
+[fps_unlock]
+strategy = "fixed_step"
+target_fps = 120
+sim_tick_hz = 60
+max_substeps = 4
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 30
+grep -q "FpsUnlockModule active (strategy=fixed_step, target_fps=120, sim_tick_hz=60, max_substeps=4, dry_run=true)" soulsframe.log
+grep -q "FpsUnlockModule shutdown (frames=30" soulsframe.log
+cp soulsframe.log soulsframe-fps-unlock.log
+
 SCENARIO_4_OK=false
 if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
   # Scenario 4: SF_PROBE draw-call tracer JSONL capture with alpha-blended particles.
@@ -194,6 +221,7 @@ cat > smoke-result.json <<EOF
   "scenario_3b_presentation_flip_pacer_ok": true,
   "scenario_3c_particles_mitigation_ok": true,
   "scenario_3d_upscaler_fsr1_ok": true,
+  "scenario_3e_fps_unlock_dry_run_ok": true,
   "scenario_4_probe_jsonl_capture_ok": ${SCENARIO_4_OK},
   "present_hook_installed": true,
   "resize_buffers_hooked": true,

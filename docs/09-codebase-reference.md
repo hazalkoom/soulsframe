@@ -1,4 +1,4 @@
-# 09. Codebase reference (M0–M7 render scale & FSR 1)
+# 09. Codebase reference (M0–M8 FPS unlock research)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -20,10 +20,12 @@ flowchart TD
   I --> M["PresentationModule::init() -> FramePacer + CreateSwapChain flip hook"]
   I --> N["ParticleModule::init() -> ID3D11DeviceContext draw filter & viewport scale"]
   I --> U["UpscalerModule::init() -> D3DCompile FSR1/RCAS pass on Present()"]
+  I --> F8["FpsUnlockModule::init() -> FixedStepStepper accumulator (dry-run when unverified)"]
   I --> P["ProbeModule::init() [SF_PROBE=1] -> install_context_hooks()"]
   J --> K["hooked_present() ticks FrameStats & calls ModuleRegistry::on_present()"]
   M --> K
   U --> K
+  F8 --> K
   N --> L
   P --> L["hooked Draw*/Dispatch/Clear* -> TraceRecorder -> async JSONL writer thread"]
 ```
@@ -50,6 +52,7 @@ flowchart TD
 | [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features; uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
 | [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
 | [src/core/sha256.h](../src/core/sha256.h) / [.cpp](../src/core/sha256.cpp) | `sf::sha256_bytes()`, `sf::sha256_hex()` | Zero-dependency SHA-256 implementation for executable version pinning. |
+| [src/timing/fixed_step.h](../src/timing/fixed_step.h) / [.cpp](../src/timing/fixed_step.cpp) | `sf::timing::FixedStepStepper`, `evaluate_fps_unlock_safety()` | Pure M8 60 Hz fixed-step simulation accumulator, spiral-of-death clamping, and dry-run build safety verdict. |
 | [src/timing/frame_pacer.h](../src/timing/frame_pacer.h) / [.cpp](../src/timing/frame_pacer.cpp) | `sf::timing::IPacerClock`, `sf::timing::FramePacer`, `sf::timing::PacerStats` | Pure hybrid sleep+spin frame-rate limiter (`[present] max_fps`) with cadence preservation and hitch recovery. |
 | [src/timing/frame_stats.h](../src/timing/frame_stats.h) / [.cpp](../src/timing/frame_stats.cpp) | `sf::timing::IClock`, `sf::timing::FrameStats`, `sf::timing::FrameMetrics` | Rolling ring-buffer frame-time stats (avg, FPS, 1%/0.1% lows, >2x median spikes). |
 | [src/timing/gpu_timing.h](../src/timing/gpu_timing.h) / [.cpp](../src/timing/gpu_timing.cpp) | `sf::timing::gpu_ticks_to_ms()`, `resolve_gpu_frame()`, `GpuSlotRing` | Pure GPU-timestamp math (ticks to ms, N+1 stamps to N pass segments, rejects disjoint/zero-frequency/non-monotonic data) and the in-flight query slot ring. |
@@ -75,6 +78,7 @@ flowchart TD
 | [src/gfx/d3d11/particle_module.h](../src/gfx/d3d11/particle_module.h) / [.cpp](../src/gfx/d3d11/particle_module.cpp) | `sf::gfx::ParticleModule`, `filter_d3d11_draw()`, `finish_d3d11_draw()` | M6 particle mitigation module: detects DS3 read-only-depth blended draws, caps overdraw/instance budgets, and applies temporary low-res viewport scaling (cooperates seamlessly with `SF_PROBE` hooks). |
 | [src/gfx/d3d11/presentation_module.h](../src/gfx/d3d11/presentation_module.h) / [.cpp](../src/gfx/d3d11/presentation_module.cpp) | `sf::gfx::PresentationModule` | M5 presentation & pacing module: hooks `IDXGIFactory::CreateSwapChain` (slot 10) for safe `FLIP_DISCARD` upgrades with automatic fallback, and drives `FramePacer` + `ALLOW_TEARING` in `on_present()`. |
 | [src/gfx/d3d11/upscaler_module.h](../src/gfx/d3d11/upscaler_module.h) / [.cpp](../src/gfx/d3d11/upscaler_module.cpp) | `sf::gfx::UpscalerModule` | M7 spatial upscaler & RCAS sharpening module (`[modules] upscaler`, `[upscaler]`): compiles SM 4.0 fullscreen VS+PS via `D3DCompile` at runtime and executes on non-MSAA back buffers. |
+| [src/timing/fps_unlock_module.h](../src/timing/fps_unlock_module.h) / [.cpp](../src/timing/fps_unlock_module.cpp) | `sf::timing::FpsUnlockModule` | M8 experimental FPS unlock module (`[modules] fps_unlock`, `[fps_unlock]`): runs `FixedStepStepper` in read-only dry-run mode on unverified builds. |
 | [src/gfx/d3d11/swapchain_hook.h](../src/gfx/d3d11/swapchain_hook.h) / [.cpp](../src/gfx/d3d11/swapchain_hook.cpp) | `install_swapchain_hooks()`, `hooked_present()`, `hooked_resize_buffers()` | Creates a dummy D3D11 device to resolve `IDXGISwapChain` vtable slots 8 & 13 and hooks them with MinHook. |
 | [src/gfx/d3d11/context_hook.h](../src/gfx/d3d11/context_hook.h) / [.cpp](../src/gfx/d3d11/context_hook.cpp) | `install_context_hooks()`, `remove_context_hooks()` | (`SF_PROBE=1` only) Hooks 7 `ID3D11DeviceContext` vtable slots (`DrawIndexed`, `Draw`, `DrawIndexedInstanced`, `DrawInstanced`, `Dispatch`, `ClearRenderTargetView`, `ClearDepthStencilView`), capturing RTV/blend/depth/shader/RVA state cleanly with COM reference counting and re-entrancy guards. |
 | [src/gfx/d3d11/gpu_timer.h](../src/gfx/d3d11/gpu_timer.h) / [.cpp](../src/gfx/d3d11/gpu_timer.cpp) | `sf::gfx::GpuTimer`, `GpuFrameResult` | (`SF_PROBE=1` only) D3D11 `TIMESTAMP`/`TIMESTAMP_DISJOINT` queries in an 8-slot ring: one stamp per pass start plus end of frame, polled with `DONOTFLUSH` so the GPU is never stalled; degrades to no `gpu_ms` if queries are unsupported. |

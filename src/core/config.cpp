@@ -103,8 +103,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     return out;
   }
 
-  constexpr std::array<std::string_view, 6> kRootKeys = {"general", "present",   "modules",
-                                                         "probe",   "particles", "upscaler"};
+  constexpr std::array<std::string_view, 7> kRootKeys = {
+      "general", "present", "modules", "probe", "particles", "upscaler", "fps_unlock"};
   warn_unknown_keys(root, "", kRootKeys, out.warnings);
 
   if (auto* gen = root["general"].as_table()) {
@@ -147,8 +147,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* mods = root["modules"].as_table()) {
-    constexpr std::array<std::string_view, 5> kModKeys = {"frame_telemetry", "presentation",
-                                                          "probe_tracer", "particles", "upscaler"};
+    constexpr std::array<std::string_view, 6> kModKeys = {
+        "frame_telemetry", "presentation", "probe_tracer", "particles", "upscaler", "fps_unlock"};
     warn_unknown_keys(*mods, "modules.", kModKeys, out.warnings);
 
     read_bool_key(*mods, "frame_telemetry", "modules.frame_telemetry",
@@ -160,6 +160,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     read_bool_key(*mods, "particles", "modules.particles", out.config.modules.particles,
                   out.warnings);
     read_bool_key(*mods, "upscaler", "modules.upscaler", out.config.modules.upscaler, out.warnings);
+    read_bool_key(*mods, "fps_unlock", "modules.fps_unlock", out.config.modules.fps_unlock,
+                  out.warnings);
   }
 
   if (auto* part = root["particles"].as_table()) {
@@ -215,6 +217,29 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                      out.config.upscaler.scale_percent, out.warnings);
     read_clamped_u32(*up, "sharpness_percent", "upscaler.sharpness_percent", 0U, 100U,
                      out.config.upscaler.sharpness_percent, out.warnings);
+  }
+
+  if (auto* fu = root["fps_unlock"].as_table()) {
+    constexpr std::array<std::string_view, 4> kFpsUnlockKeys = {"strategy", "target_fps",
+                                                                "sim_tick_hz", "max_substeps"};
+    warn_unknown_keys(*fu, "fps_unlock.", kFpsUnlockKeys, out.warnings);
+
+    if (auto v = (*fu)["strategy"].value<std::string>()) {
+      if (*v == "fixed_step" || *v == "camera_only" || *v == "variable_dt") {
+        out.config.fps_unlock.strategy = *v;
+      } else {
+        out.warnings.emplace_back("fps_unlock.strategy invalid ('" + *v + "'); using 'fixed_step'");
+      }
+    } else if (fu->contains("strategy")) {
+      out.warnings.emplace_back("fps_unlock.strategy must be string; using default");
+    }
+
+    read_clamped_u32(*fu, "target_fps", "fps_unlock.target_fps", 60U, 360U,
+                     out.config.fps_unlock.target_fps, out.warnings);
+    read_clamped_u32(*fu, "sim_tick_hz", "fps_unlock.sim_tick_hz", 30U, 120U,
+                     out.config.fps_unlock.sim_tick_hz, out.warnings);
+    read_clamped_u32(*fu, "max_substeps", "fps_unlock.max_substeps", 1U, 8U,
+                     out.config.fps_unlock.max_substeps, out.warnings);
   }
 
   if (auto* prb = root["probe"].as_table()) {
