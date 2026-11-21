@@ -42,6 +42,7 @@ struct Config {
     bool particles = false;
     bool upscaler = false;
     bool fps_unlock = false;
+    bool textures = false;
   } modules;
 
   /// Milestone 6 particle pass mitigation and overdraw budget settings.
@@ -92,6 +93,18 @@ struct Config {
     /// Maximum simulation substeps per render frame to prevent spiral-of-death stalls ([1, 8]).
     uint32_t max_substeps = 4;
   } fps_unlock;
+
+  /// Milestone 9 offline texture-pack replacement settings (`CreateTexture2D` hash swap).
+  struct Textures {
+    /// Pack folder name next to `dinput8.dll` containing `manifest.txt` and DDS files.
+    std::string pack_dir = "soulsframe_textures";
+
+    /// Maximum replacement bytes uploaded per session in MiB (clamped to [16, 4096]).
+    uint32_t max_pack_mb = 512;
+
+    /// Log keys of eligible textures (first 4096 unique) so packs can be authored offline.
+    bool dump_keys = false;
+  } textures;
 
   /// Settings for `SF_PROBE` draw-call and pass JSONL capture builds.
   struct Probe {

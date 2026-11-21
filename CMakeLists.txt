@@ -33,6 +33,7 @@ add_library(soulsframe_core STATIC
   src/gfx/fx/fsr1_math.cpp
   src/hooks/sigscan.cpp
   src/tex/content_hash.cpp
+  src/tex/texture_pack.cpp
   src/timing/fixed_step.cpp
   src/timing/frame_pacer.cpp
   src/timing/frame_stats.cpp
@@ -75,6 +76,7 @@ if(NOT SF_HOST_ONLY)
     src/gfx/d3d11/particle_module.cpp
     src/gfx/d3d11/presentation_module.cpp
     src/gfx/d3d11/swapchain_hook.cpp
+    src/gfx/d3d11/texture_module.cpp
     src/gfx/d3d11/upscaler_module.cpp
     src/timing/fps_unlock_module.cpp
   )

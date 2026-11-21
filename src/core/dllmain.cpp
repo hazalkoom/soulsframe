@@ -9,6 +9,7 @@
 #include "gfx/d3d11/particle_module.h"
 #include "gfx/d3d11/presentation_module.h"
 #include "gfx/d3d11/swapchain_hook.h"
+#include "gfx/d3d11/texture_module.h"
 #include "gfx/d3d11/upscaler_module.h"
 #include "timing/fps_unlock_module.h"
 
@@ -82,6 +83,7 @@ DWORD WINAPI init_thread(LPVOID) {
   g_registry.register_module(std::make_unique<sf::gfx::ParticleModule>());
   g_registry.register_module(std::make_unique<sf::gfx::UpscalerModule>());
   g_registry.register_module(std::make_unique<sf::timing::FpsUnlockModule>());
+  g_registry.register_module(std::make_unique<sf::gfx::TextureModule>(sf::log::module_dir(g_self)));
 #ifdef SF_PROBE
   g_registry.register_module(
       std::make_unique<sf::probe::ProbeModule>(sf::log::module_dir(g_self), exe_sha));

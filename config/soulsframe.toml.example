@@ -20,6 +20,7 @@ probe_tracer = false
 particles = false
 upscaler = false
 fps_unlock = false
+textures = false
 
 [particles]
 # M6 particle overdraw mitigation: "auto", "throttle", or "half_res"
@@ -42,6 +43,13 @@ strategy = "fixed_step"
 target_fps = 120
 sim_tick_hz = 60
 max_substeps = 4
+
+[textures]
+# M9 offline texture packs: folder next to dinput8.dll with manifest.txt + DDS files
+pack_dir = "soulsframe_textures"
+max_pack_mb = 512
+# Log keys of loaded textures so packs can be authored with tools/py/bake_textures.py
+dump_keys = false
 
 [probe]
 # Only used in SF_PROBE builds when modules.probe_tracer = true.

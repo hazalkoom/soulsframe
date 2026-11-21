@@ -50,7 +50,9 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
 - **M2 (`sf-probe` v1 draw-call tracer):** **Implemented** — pure `TraceRecorder` & JSONL serializer, `ID3D11DeviceContext` vtable hooks (7 slots, `SF_PROBE=1`), async `ProbeModule`, `[probe]` config kill switches, `gcovr` coverage gate (`host-cov`), 3 `libFuzzer` targets, 4-scenario Wine smoke suite (`--particles`), and extended `analyze_capture.py`.
 - **M3 (GPU pass timing + benchmarks):** **Implemented** — pure `gpu_timing`/`GpuFrameJoiner` (Linux-tested), `GpuTimer` D3D11 timestamp queries wired into the probe (`probe.gpu_timing` kill switch, `gpu_ms` JSONL fields), Release `host-bench` micro-benchmark suite + CI job, analyzer GPU stats.
 - **M4 (RE foundation):** **Implemented** — pure `pe_dump` & `sig_db` (Linux-tested, `ds3_sigs.toml` + RIP-relative resolver), read-only Win32 `win_dump` (`probe.dump_module`, Wine-verified), native `sftool` CLI, headless Ghidra `ExportSymbols.java`.
-- **Next milestones:** M5 (presentation/flip-model experiments), M6 (low-res particles), M7 (FSR 1), M8 (FPS unlock research).
+- **M5–M8:** **Implemented** — flip-model + frame pacer, particle mitigation, FSR 1 upscaler, fixed-step FPS unlock research.
+- **M9 (Texture swap & bake):** **Implemented** — pure `texture_pack` (keys/DDS/manifest/budget), `TextureModule` `CreateTexture2D` hook, `tools/py/bake_textures.py`.
+- **Next milestones:** M10 (polish & release), then in-game hotkeys/overlay.
 
 ## Commit & documentation workflow
 

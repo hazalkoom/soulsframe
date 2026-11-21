@@ -20,6 +20,7 @@ add_executable(soulsframe_unit_tests
   test_sha256.cpp
   test_sig_db.cpp
   test_sigscan.cpp
+  test_texture_pack.cpp
 )
 
 target_compile_options(soulsframe_unit_tests PRIVATE ${SF_WARN_FLAGS})

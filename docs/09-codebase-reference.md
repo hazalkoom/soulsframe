@@ -68,6 +68,8 @@ flowchart TD
 | [src/probe/trace_types.h](../src/probe/trace_types.h) / [.cpp](../src/probe/trace_types.cpp) | `sf::probe::TraceRecorder`, `DrawCallState`, `classify_pass()`, `PassSummary`, `CallSiteStats` | Pure-C++ M2 draw-call aggregator, pass-boundary detector, resource deduplicator, and heuristic pass classifier (`particles_alpha`, `gbuffer`, `shadow`, etc.). |
 | [src/probe/jsonl_writer.h](../src/probe/jsonl_writer.h) / [.cpp](../src/probe/jsonl_writer.cpp) | `sf::probe::format_session_header()`, `serialize_frame_snapshot()`, `json_escape()` | Pure-C++ JSONL event serializer emitting `session_header`, `resource`, `frame`, `gpu_pass`, and `draw_site` records. |
 
+- `src/tex/texture_pack.{h,cpp}` — M9 texture keys, DDS parsing, manifest parsing, VRAM budget policy.
+
 ## 4. Windows DLL & D3D11 hook layer
 
 | File | Key symbols | Responsibility |
@@ -86,6 +88,8 @@ flowchart TD
 | [src/probe/win_dump.h](../src/probe/win_dump.h) / [.cpp](../src/probe/win_dump.cpp) | `sf::probe::dump_host_module_to_file()` | (`SF_PROBE=1` only) Read-only `VirtualQuery` memory dump + Ghidra section alignment fixup (`probe.dump_module`). |
 | [tools/cpp/sftool_main.cpp](../tools/cpp/sftool_main.cpp) | `sftool` (`builds hash`, `pe-info`, `pe-fixup`, `sigmaker`, `sigtest`) | Native Linux host CLI sharing `soulsframe_core` and `soulsframe_probe_core` for signature verification and PE dump analysis. |
 | [src/core/dllmain.cpp](../src/core/dllmain.cpp) | `DllMain`, `init_thread`, `FrameTelemetryModule` | Spawns background initialization outside loader lock, registers active modules (`FrameTelemetryModule`, plus `ProbeModule` in `SF_PROBE`), and orchestrates clean shutdown. |
+
+- `src/gfx/d3d11/texture_module.{h,cpp}` — M9 `CreateTexture2D` detour swapping keyed textures from `pack_dir/manifest.txt` (`tools/py/bake_textures.py` builds packs).
 
 ## 5. Tests and verification scripts
 

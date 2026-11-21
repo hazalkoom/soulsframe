@@ -103,8 +103,8 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     return out;
   }
 
-  constexpr std::array<std::string_view, 7> kRootKeys = {
-      "general", "present", "modules", "probe", "particles", "upscaler", "fps_unlock"};
+  constexpr std::array<std::string_view, 8> kRootKeys = {
+      "general", "present", "modules", "probe", "particles", "upscaler", "fps_unlock", "textures"};
   warn_unknown_keys(root, "", kRootKeys, out.warnings);
 
   if (auto* gen = root["general"].as_table()) {
@@ -147,8 +147,9 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* mods = root["modules"].as_table()) {
-    constexpr std::array<std::string_view, 6> kModKeys = {
-        "frame_telemetry", "presentation", "probe_tracer", "particles", "upscaler", "fps_unlock"};
+    constexpr std::array<std::string_view, 7> kModKeys = {
+        "frame_telemetry", "presentation", "probe_tracer", "particles",
+        "upscaler",        "fps_unlock",   "textures"};
     warn_unknown_keys(*mods, "modules.", kModKeys, out.warnings);
 
     read_bool_key(*mods, "frame_telemetry", "modules.frame_telemetry",
@@ -162,6 +163,7 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     read_bool_key(*mods, "upscaler", "modules.upscaler", out.config.modules.upscaler, out.warnings);
     read_bool_key(*mods, "fps_unlock", "modules.fps_unlock", out.config.modules.fps_unlock,
                   out.warnings);
+    read_bool_key(*mods, "textures", "modules.textures", out.config.modules.textures, out.warnings);
   }
 
   if (auto* part = root["particles"].as_table()) {
@@ -240,6 +242,17 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                      out.config.fps_unlock.sim_tick_hz, out.warnings);
     read_clamped_u32(*fu, "max_substeps", "fps_unlock.max_substeps", 1U, 8U,
                      out.config.fps_unlock.max_substeps, out.warnings);
+  }
+
+  if (auto* tx = root["textures"].as_table()) {
+    constexpr std::array<std::string_view, 3> kTexKeys = {"pack_dir", "max_pack_mb", "dump_keys"};
+    warn_unknown_keys(*tx, "textures.", kTexKeys, out.warnings);
+    read_safe_filename(*tx, "pack_dir", "textures.pack_dir", out.config.textures.pack_dir,
+                       out.warnings);
+    read_clamped_u32(*tx, "max_pack_mb", "textures.max_pack_mb", 16U, 4096U,
+                     out.config.textures.max_pack_mb, out.warnings);
+    read_bool_key(*tx, "dump_keys", "textures.dump_keys", out.config.textures.dump_keys,
+                  out.warnings);
   }
 
   if (auto* prb = root["probe"].as_table()) {
