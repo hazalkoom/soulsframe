@@ -2,6 +2,7 @@
 
 #include "core/config.h"
 #include "core/log.h"
+#include "core/version.h"
 #include "games/ds3/profile.h"
 #include "gfx/d3d11/context_hook.h"
 #include "probe/jsonl_writer.h"
@@ -47,7 +48,7 @@ bool ProbeModule::init(const sf::GameProfile& profile, const sf::Config& cfg) {
   }
 
   SessionHeaderInfo hdr;
-  hdr.mod_version = "0.2.0";
+  hdr.mod_version = sf::kVersionString;
   hdr.game = profile.id;
   hdr.exe_sha256 = exe_sha256_;
   hdr.build_mode = "probe";

@@ -20,6 +20,8 @@ fi
 pure_files=(
   src/core/config.h
   src/core/config.cpp
+  src/core/config_diagnostics.h
+  src/core/config_diagnostics.cpp
   src/core/module.h
   src/core/module_registry.h
   src/core/module_registry.cpp
@@ -27,6 +29,7 @@ pure_files=(
   src/core/offline_guard.cpp
   src/core/sha256.h
   src/core/sha256.cpp
+  src/core/version.h
   src/games/ds3/profile.h
   src/games/ds3/profile.cpp
   src/games/ds3/render.h
@@ -68,15 +71,23 @@ for f in "${pure_files[@]}"; do
   fi
 done
 
-# 3. Verify offline-only safety default in template config.
-if ! grep -Eq '^\s*offline_acknowledged\s*=\s*false\b' config/soulsframe.toml.example; then
-  echo "Safety violation: config/soulsframe.toml.example must default offline_acknowledged = false!"
-  exit 1
+# 3. Verify offline-only safety default in template config and presets.
+template_files=(config/soulsframe.toml.example)
+if compgen -G "config/presets/*.toml" >/dev/null; then
+  for preset in config/presets/*.toml; do
+    template_files+=("$preset")
+  done
 fi
-if grep -Eq '^\s*offline_acknowledged\s*=\s*true\b' config/soulsframe.toml.example; then
-  echo "Safety violation: config/soulsframe.toml.example must never default offline_acknowledged = true!"
-  exit 1
-fi
+for tmpl in "${template_files[@]}"; do
+  if ! grep -Eq '^\s*offline_acknowledged\s*=\s*false\b' "$tmpl"; then
+    echo "Safety violation: $tmpl must default offline_acknowledged = false!"
+    exit 1
+  fi
+  if grep -Eq '^\s*offline_acknowledged\s*=\s*true\b' "$tmpl"; then
+    echo "Safety violation: $tmpl must never default offline_acknowledged = true!"
+    exit 1
+  fi
+done
 
 # 4. Enforce game offsets isolation: no hardcoded x64 image base RVAs outside src/games/ds3/.
 rva_leaks=$(grep -rnE '0x14[0-9a-fA-F]{7}' src/ --exclude-dir=ds3 || true)

@@ -408,6 +408,16 @@ void UpscalerModule::on_present(sf::PresentCtx& ctx) {
   back->Release();
 }
 
+void UpscalerModule::on_resize() {
+  if (!impl_->active) {
+    return;
+  }
+  if (impl_->cached_width != 0U || impl_->cached_height != 0U) {
+    ++impl_->resizes;
+  }
+  impl_->release_targets();
+}
+
 void UpscalerModule::shutdown() {
   if (!impl_->active) {
     return;

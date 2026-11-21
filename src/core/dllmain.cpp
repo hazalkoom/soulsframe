@@ -1,9 +1,11 @@
 #include <windows.h>
 
 #include "core/config.h"
+#include "core/config_diagnostics.h"
 #include "core/log.h"
 #include "core/module_registry.h"
 #include "core/offline_guard.h"
+#include "core/version.h"
 #include "core/win_helpers.h"
 #include "games/ds3/profile.h"
 #include "gfx/d3d11/particle_module.h"
@@ -27,9 +29,12 @@ sf::ModuleRegistry g_registry;
 class FrameTelemetryModule final : public sf::Module {
 public:
   const char* name() const override { return "frame_telemetry"; }
-  bool is_enabled(const sf::Config& cfg) const override { return cfg.modules.frame_telemetry; }
-  bool init(const sf::GameProfile&, const sf::Config&) override {
-    return sf::gfx::install_swapchain_hooks(&g_registry);
+  bool is_enabled(const sf::Config& cfg) const override {
+    return cfg.modules.frame_telemetry || cfg.modules.presentation || cfg.modules.particles ||
+           cfg.modules.upscaler || cfg.modules.fps_unlock || cfg.modules.probe_tracer;
+  }
+  bool init(const sf::GameProfile&, const sf::Config& cfg) override {
+    return sf::gfx::install_swapchain_hooks(&g_registry, cfg.modules.frame_telemetry);
   }
   void shutdown() override { sf::gfx::remove_swapchain_hooks(); }
 };
@@ -40,17 +45,22 @@ public:
 DWORD WINAPI init_thread(LPVOID) {
   sf::log::init(g_self);
 #ifdef SF_PROBE
-  SF_LOG("SoulsFrame starting (probe build)");
+  constexpr bool kIsProbeBuild = true;
+  SF_LOG("%s v%s starting (probe build)", sf::kProductName, sf::kVersionString);
 #else
-  SF_LOG("SoulsFrame starting (release build)");
+  constexpr bool kIsProbeBuild = false;
+  SF_LOG("%s v%s starting (release build)", sf::kProductName, sf::kVersionString);
 #endif
 
   const std::string cfg_path = sf::log::module_dir(g_self) + "\\soulsframe.toml";
   const auto cfg_res = sf::load_config_file(cfg_path);
-  for (const auto& w : cfg_res.warnings) {
-    SF_LOG("config warning: %s", w.c_str());
-  }
   const sf::Config& cfg = cfg_res.config;
+  sf::log::set_level(sf::log::parse_level(cfg.general.log_level));
+
+  for (const auto& w : cfg_res.warnings) {
+    SF_LOG_WARN("config warning: %s", w.c_str());
+  }
+  SF_LOG("config summary: %s", sf::format_config_summary(cfg).c_str());
 
   if (!cfg.general.mod_enabled) {
     SF_LOG("Mod disabled by general.mod_enabled = false");
@@ -63,12 +73,16 @@ DWORD WINAPI init_thread(LPVOID) {
   offline_in.command_line_args = sf::get_process_args();
   const auto verdict = sf::evaluate_offline_guard(offline_in);
   if (!verdict.allowed) {
-    SF_LOG("OFFLINE GUARD BLOCKED MOD INIT: %s", verdict.reason.c_str());
+    SF_LOG_WARN("OFFLINE GUARD BLOCKED MOD INIT: %s", verdict.reason.c_str());
+    SF_LOG_WARN("Action: set offline_acknowledged = true under [general] in soulsframe.toml "
+                "(offline play only).");
     return 0;
   }
 
   for (const auto& overlay : sf::detect_known_overlays()) {
-    SF_LOG("warning: detected overlay/injector module loaded: %s", overlay.c_str());
+    SF_LOG_WARN("warning: detected overlay/injector module loaded: %s (disable overlays if hooks "
+                "conflict)",
+                overlay.c_str());
   }
 
   const std::string exe_sha = sf::compute_host_exe_sha256();
@@ -77,6 +91,18 @@ DWORD WINAPI init_thread(LPVOID) {
   const auto profile = sf::games::ds3::resolve_profile(exe_sha);
   SF_LOG("profile=%s engine_hooks_allowed=%s", profile.id.c_str(),
          profile.engine_hooks_allowed ? "true" : "false");
+
+  const sf::DiagnosticContext diag_ctx{.is_probe_build = kIsProbeBuild,
+                                       .exe_hooks_allowed = profile.engine_hooks_allowed};
+  for (const auto& d : sf::diagnose_config(cfg, diag_ctx)) {
+    if (d.severity == sf::DiagnosticSeverity::Info) {
+      SF_LOG("config diagnostic [%s]: %s", d.code.c_str(), d.message.c_str());
+    } else if (d.severity == sf::DiagnosticSeverity::Warning) {
+      SF_LOG_WARN("config diagnostic [%s]: %s", d.code.c_str(), d.message.c_str());
+    } else {
+      SF_LOG_ERROR("config diagnostic [%s]: %s", d.code.c_str(), d.message.c_str());
+    }
+  }
 
   g_registry.register_module(std::make_unique<FrameTelemetryModule>());
   g_registry.register_module(std::make_unique<sf::gfx::PresentationModule>());

@@ -21,6 +21,7 @@ public:
   bool is_enabled(const sf::Config& cfg) const override { return cfg.modules.upscaler; }
   bool init(const sf::GameProfile& profile, const sf::Config& cfg) override;
   void on_present(sf::PresentCtx& ctx) override;
+  void on_resize() override;
   void shutdown() override;
 
 private:

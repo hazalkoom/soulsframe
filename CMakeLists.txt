@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(soulsframe LANGUAGES C CXX)
+project(soulsframe VERSION 0.10.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +24,7 @@ include(cmake/deps.cmake)
 
 add_library(soulsframe_core STATIC
   src/core/config.cpp
+  src/core/config_diagnostics.cpp
   src/core/module_registry.cpp
   src/core/offline_guard.cpp
   src/core/sha256.cpp

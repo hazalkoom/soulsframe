@@ -48,6 +48,10 @@ struct Module {
   /// Executed once per presented frame while the module is active.
   virtual void on_present(PresentCtx& ctx) { (void)ctx; }
 
+  /// Invoked immediately before `IDXGISwapChain::ResizeBuffers` so modules release swap-chain
+  /// references before buffers are resized.
+  virtual void on_resize() {}
+
   /// Removes hooks and frees resources during teardown.
   virtual void shutdown() = 0;
 };

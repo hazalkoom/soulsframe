@@ -33,6 +33,8 @@ WinClock g_clock;
 timing::FrameStats g_stats(120);
 std::atomic<uint64_t> g_frame_index{0};
 bool g_hooks_installed = false;
+bool g_owns_mh_init = false;
+bool g_log_telemetry = true;
 
 /// Intercepts `IDXGISwapChain::Present` (slot 8) to update rolling frame telemetry
 /// and drive registered per-frame modules before forwarding to DXGI.
@@ -44,7 +46,7 @@ HRESULT STDMETHODCALLTYPE hooked_present(IDXGISwapChain* sc, UINT sync_interval,
     std::lock_guard lk(g_stats_mu);
     dt_ms = g_stats.tick(g_clock);
     frame = ++g_frame_index;
-    if (frame % 120 == 0 && g_stats.count() > 0) {
+    if (g_log_telemetry && frame % 120 == 0 && g_stats.count() > 0) {
       const auto m = g_stats.compute_metrics();
       SF_LOG("avg frame time %.3f ms (%.1f fps) | p1_low %.3f ms | spikes %u", m.avg_ms, m.avg_fps,
              m.p1_low_ms, m.spike_count);
@@ -64,20 +66,27 @@ HRESULT STDMETHODCALLTYPE hooked_present(IDXGISwapChain* sc, UINT sync_interval,
   return g_orig_present(sc, effective_sync, effective_flags);
 }
 
-/// Intercepts `IDXGISwapChain::ResizeBuffers` (slot 13) so future modules can
-/// release and recreate resolution-dependent render targets across resizes.
+/// Intercepts `IDXGISwapChain::ResizeBuffers` (slot 13) so modules release resolution-dependent
+/// swap-chain references cleanly before DXGI reallocates buffers.
 HRESULT STDMETHODCALLTYPE hooked_resize_buffers(IDXGISwapChain* sc, UINT buffer_count, UINT width,
                                                 UINT height, DXGI_FORMAT new_format,
                                                 UINT swapchain_flags) {
   SF_LOG("IDXGISwapChain::ResizeBuffers(%ux%u, buffers=%u, fmt=%u, flags=0x%x)", width, height,
          buffer_count, static_cast<unsigned>(new_format), swapchain_flags);
+  if (g_registry) {
+    g_registry->on_resize();
+  }
   return g_orig_resize(sc, buffer_count, width, height, new_format, swapchain_flags);
 }
 
 } // namespace
 
-bool install_swapchain_hooks(ModuleRegistry* registry) {
+bool install_swapchain_hooks(ModuleRegistry* registry, bool log_telemetry) {
+  if (g_hooks_installed) {
+    return true;
+  }
   g_registry = registry;
+  g_log_telemetry = log_telemetry;
 
   // Create a minimal hidden window + throwaway D3D11 device/swapchain solely to
   // discover DXGI's IDXGISwapChain vtable addresses before the game creates its own.
@@ -134,31 +143,42 @@ bool install_swapchain_hooks(ModuleRegistry* registry) {
   DestroyWindow(hwnd);
   UnregisterClassA(wc.lpszClassName, wc.hInstance);
 
-  if (MH_Initialize() != MH_OK) {
-    SF_LOG("MH_Initialize failed");
+  const MH_STATUS mh = MH_Initialize();
+  if (mh != MH_OK && mh != MH_ERROR_ALREADY_INITIALIZED) {
+    SF_LOG_ERROR("MH_Initialize failed (%d)", static_cast<int>(mh));
     return false;
   }
+  g_owns_mh_init = (mh == MH_OK);
+
+  auto rollback_init = [&]() {
+    if (g_owns_mh_init) {
+      MH_Uninitialize();
+      g_owns_mh_init = false;
+    }
+  };
 
   if (MH_CreateHook(g_present_target, reinterpret_cast<void*>(&hooked_present),
                     reinterpret_cast<void**>(&g_orig_present)) != MH_OK) {
-    SF_LOG("MH_CreateHook(Present) failed");
-    MH_Uninitialize();
+    SF_LOG_ERROR("MH_CreateHook(Present) failed");
+    rollback_init();
     return false;
   }
 
   if (MH_CreateHook(g_resize_target, reinterpret_cast<void*>(&hooked_resize_buffers),
                     reinterpret_cast<void**>(&g_orig_resize)) != MH_OK) {
-    SF_LOG("MH_CreateHook(ResizeBuffers) failed");
+    SF_LOG_ERROR("MH_CreateHook(ResizeBuffers) failed");
     MH_RemoveHook(g_present_target);
-    MH_Uninitialize();
+    rollback_init();
     return false;
   }
 
-  if (MH_EnableHook(MH_ALL_HOOKS) != MH_OK) {
-    SF_LOG("MH_EnableHook failed");
+  if (MH_EnableHook(g_present_target) != MH_OK || MH_EnableHook(g_resize_target) != MH_OK) {
+    SF_LOG_ERROR("MH_EnableHook failed for Present/ResizeBuffers");
+    MH_DisableHook(g_resize_target);
+    MH_DisableHook(g_present_target);
     MH_RemoveHook(g_resize_target);
     MH_RemoveHook(g_present_target);
-    MH_Uninitialize();
+    rollback_init();
     return false;
   }
 
@@ -173,14 +193,20 @@ void remove_swapchain_hooks() {
   }
   SF_LOG("Swapchain hooks removed (total_frames=%llu)",
          static_cast<unsigned long long>(g_frame_index.load()));
-  MH_DisableHook(MH_ALL_HOOKS);
   if (g_resize_target) {
+    MH_DisableHook(g_resize_target);
     MH_RemoveHook(g_resize_target);
+    g_resize_target = nullptr;
   }
   if (g_present_target) {
+    MH_DisableHook(g_present_target);
     MH_RemoveHook(g_present_target);
+    g_present_target = nullptr;
   }
-  MH_Uninitialize();
+  if (g_owns_mh_init) {
+    MH_Uninitialize();
+    g_owns_mh_init = false;
+  }
   g_hooks_installed = false;
   g_registry = nullptr;
 }

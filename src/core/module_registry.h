@@ -29,6 +29,10 @@ public:
   /// Exceptions thrown by a module disable only that module and mark its status inactive.
   void on_present(PresentCtx& ctx);
 
+  /// Dispatches pre-resize cleanup to all currently active modules.
+  /// Exceptions thrown by a module disable only that module and mark its status inactive.
+  void on_resize();
+
   /// Shuts down active modules in reverse initialization order, isolating any exceptions
   /// so remaining modules still clean up cleanly.
   void shutdown_all();

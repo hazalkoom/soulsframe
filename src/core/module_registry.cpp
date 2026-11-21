@@ -65,6 +65,24 @@ void ModuleRegistry::on_present(PresentCtx& ctx) {
   }
 }
 
+void ModuleRegistry::on_resize() {
+  for (size_t i = 0; i < entries_.size(); ++i) {
+    auto& entry = entries_[i];
+    if (!entry.active) {
+      continue;
+    }
+    try {
+      entry.mod->on_resize();
+    } catch (...) {
+      entry.active = false;
+      if (i < statuses_.size()) {
+        statuses_[i].active = false;
+        statuses_[i].detail = "disabled after exception in on_resize";
+      }
+    }
+  }
+}
+
 void ModuleRegistry::shutdown_all() {
   for (size_t i = entries_.size(); i > 0; --i) {
     const size_t idx = i - 1;
