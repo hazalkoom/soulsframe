@@ -297,9 +297,21 @@ jobs:
             build/host-fuzz/libsoulsframe_probe_core.a build/host-fuzz/libsoulsframe_core.a \
             build/host-fuzz/_deps/xxhash-build/libxxhash.a \
             -o build/host-fuzz/fuzz_probe_jsonl
+          clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc \
+            tests/fuzz/fuzz_texture_dds.cpp \
+            build/host-fuzz/libsoulsframe_core.a build/host-fuzz/_deps/xxhash-build/libxxhash.a \
+            -o build/host-fuzz/fuzz_texture_dds
+          clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc \
+            tests/fuzz/fuzz_texture_manifest.cpp \
+            build/host-fuzz/libsoulsframe_core.a build/host-fuzz/_deps/xxhash-build/libxxhash.a \
+            -o build/host-fuzz/fuzz_texture_manifest
           ./build/host-fuzz/fuzz_config tests/fuzz/corpus/config -max_total_time=10
           ./build/host-fuzz/fuzz_sigscan tests/fuzz/corpus/sigscan -max_total_time=10
           ./build/host-fuzz/fuzz_probe_jsonl tests/fuzz/corpus/probe_jsonl -max_total_time=10
+          ./build/host-fuzz/fuzz_texture_dds tests/fuzz/corpus/dds -max_total_time=10
+          ./build/host-fuzz/fuzz_texture_manifest tests/fuzz/corpus/manifest -max_total_time=10
 
   win64:
     if: needs.changes.outputs.heavy == 'true'
