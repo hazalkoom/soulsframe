@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
   int frames = 300;
   bool do_resize = false;
   bool do_particles = false;
+  bool do_textures = false;
   UINT msaa = 1;
 
   for (int i = 1; i < argc; ++i) {
@@ -19,6 +20,8 @@ int main(int argc, char** argv) {
       do_resize = true;
     } else if (std::strcmp(argv[i], "--particles") == 0) {
       do_particles = true;
+    } else if (std::strcmp(argv[i], "--textures") == 0) {
+      do_textures = true;
     } else if (std::strcmp(argv[i], "--msaa") == 0 && i + 1 < argc) {
       msaa = static_cast<UINT>(std::atoi(argv[++i]));
     }
@@ -97,6 +100,25 @@ int main(int argc, char** argv) {
     }
   };
   rebuild_rtv();
+
+  ID3D11Texture2D* test_tex = nullptr;
+  if (do_textures) {
+    UINT pixels[64]{};
+    for (UINT i = 0; i < 64U; ++i) {
+      pixels[i] = 0xFF000000U | (i * 4U) | ((255U - i * 3U) << 8U);
+    }
+    D3D11_TEXTURE2D_DESC tdesc{};
+    tdesc.Width = 8;
+    tdesc.Height = 8;
+    tdesc.MipLevels = 1;
+    tdesc.ArraySize = 1;
+    tdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    tdesc.SampleDesc.Count = 1;
+    tdesc.Usage = D3D11_USAGE_IMMUTABLE;
+    tdesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    D3D11_SUBRESOURCE_DATA init_tex{pixels, 8U * 4U, 0};
+    dev->CreateTexture2D(&tdesc, &init_tex, &test_tex);
+  }
 
   ID3D11BlendState* alpha_blend = nullptr;
   ID3D11DepthStencilState* no_depth_write = nullptr;
@@ -230,6 +252,8 @@ int main(int argc, char** argv) {
     no_depth_write->Release();
   if (alpha_blend)
     alpha_blend->Release();
+  if (test_tex)
+    test_tex->Release();
   if (rtv)
     rtv->Release();
   ctx->Release();

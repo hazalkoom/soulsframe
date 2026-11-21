@@ -9,7 +9,7 @@ if [ -z "$PROBE_DIR" ]; then
     PROBE_DIR="$CANDIDATE_PROBE"
   fi
 fi
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$BUILD_DIR"
 
 # Prevent Wine from writing .local/share entries into the mounted source tree
@@ -116,7 +116,7 @@ grep -q "ParticleModule active (mode=auto, scale_percent=50, max_instances=4" so
 grep -q "ParticleModule shutdown (frames=30, particle_draws=30, low_res=30, throttled=30, skipped=0, instances_culled=120" soulsframe.log
 cp soulsframe.log soulsframe-particles.log
 
-# Scenario 3d (M7): Spatial upscaler + RCAS pass on non-MSAA backbuffer.
+# Scenario 3d (M7): Spatial upscaler + RCAS pass + ResizeBuffers cleanup on non-MSAA backbuffer.
 cat > soulsframe.toml <<'EOF'
 [general]
 offline_acknowledged = true
@@ -136,9 +136,10 @@ sharpness_percent = 80
 EOF
 
 rm -f soulsframe.log
-timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 20
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 20 --resize
 grep -q "UpscalerModule active (mode=fsr1, preset=ultra_quality, scale_percent=77, sharpness=80)" soulsframe.log
-grep -q "UpscalerModule shutdown (frames=20, easu_passes=20, rcas_passes=20" soulsframe.log
+grep -q "IDXGISwapChain::ResizeBuffers(640x480" soulsframe.log
+grep -q "UpscalerModule shutdown (frames=20, easu_passes=20, rcas_passes=20, resizes=1)" soulsframe.log
 cp soulsframe.log soulsframe-upscaler.log
 
 # Scenario 3e (M8): Experimental fixed-step FPS unlock accumulator in safe dry-run mode.
@@ -167,6 +168,94 @@ timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 30
 grep -q "FpsUnlockModule active (strategy=fixed_step, target_fps=120, sim_tick_hz=60, max_substeps=4, dry_run=true)" soulsframe.log
 grep -q "FpsUnlockModule shutdown (frames=30" soulsframe.log
 cp soulsframe.log soulsframe-fps-unlock.log
+
+# Scenario 3f (M9): Texture-pack key dump + bake_textures.py + live CreateTexture2D swap.
+rm -rf soulsframe_textures soulsframe.log
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+textures = true
+
+[textures]
+pack_dir = "soulsframe_textures"
+max_pack_mb = 64
+dump_keys = true
+EOF
+
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 10 --textures
+TEX_KEY=$(sed -nE 's/.*TextureModule key ([0-9a-f]{16}) 8x8 fmt=28 mips=1.*/\1/p' soulsframe.log | head -n 1)
+if [ -z "$TEX_KEY" ]; then
+  echo "ERROR: TextureModule failed to log expected 8x8 RGBA8 key!"
+  cat soulsframe.log
+  exit 1
+fi
+mkdir -p soulsframe_textures
+python3 - <<PY
+import struct
+from pathlib import Path
+hdr = bytearray(128)
+hdr[0:4] = b"DDS "
+struct.pack_into("<IIII", hdr, 4, 124, 0x1007, 8, 8)
+struct.pack_into("<IIII", hdr, 76, 32, 0x40, 0, 32)
+struct.pack_into("<IIII", hdr, 92, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000)
+payload = bytes([0x22, 0x44, 0x88, 0xFF] * 64)
+Path(f"soulsframe_textures/${TEX_KEY}.dds").write_bytes(bytes(hdr) + payload)
+PY
+python3 "$REPO_ROOT/tools/py/bake_textures.py" build soulsframe_textures
+
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+textures = true
+
+[textures]
+pack_dir = "soulsframe_textures"
+max_pack_mb = 64
+dump_keys = false
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 10 --textures
+grep -q "TextureModule active (entries=1" soulsframe.log
+grep -q "TextureModule shutdown (observed=1, replaced=1, over_budget=0, invalid=0, bytes=256)" soulsframe.log
+cp soulsframe.log soulsframe-textures.log
+rm -rf soulsframe_textures
+
+# Scenario 3g (M10): Config diagnostics warning + log_level="warn" filtering.
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "warn"
+
+[present]
+mode = "flip"
+max_fps = 60
+
+[modules]
+frame_telemetry = true
+presentation = false
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 10
+grep -q "\[WARN\] config diagnostic \[SF_CFG_PRESENT_INACTIVE\]" soulsframe.log
+if grep -q "\[INFO\] Present hook installed" soulsframe.log; then
+  echo "ERROR: INFO logs were not filtered when general.log_level = warn!"
+  cat soulsframe.log
+  exit 1
+fi
+cp soulsframe.log soulsframe-diagnostics.log
 
 SCENARIO_4_OK=false
 if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
@@ -222,6 +311,8 @@ cat > smoke-result.json <<EOF
   "scenario_3c_particles_mitigation_ok": true,
   "scenario_3d_upscaler_fsr1_ok": true,
   "scenario_3e_fps_unlock_dry_run_ok": true,
+  "scenario_3f_textures_swap_ok": true,
+  "scenario_3g_config_diagnostics_ok": true,
   "scenario_4_probe_jsonl_capture_ok": ${SCENARIO_4_OK},
   "present_hook_installed": true,
   "resize_buffers_hooked": true,

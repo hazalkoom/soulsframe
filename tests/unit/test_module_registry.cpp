@@ -13,10 +13,11 @@ class StubModule final : public sf::Module {
 public:
   StubModule(const char* name, bool enabled, bool needs_engine, bool init_ok, int* present_counter,
              bool* shutdown_flag, bool throw_init = false, bool throw_present = false,
-             bool throw_shutdown = false)
+             bool throw_shutdown = false, int* resize_counter = nullptr, bool throw_resize = false)
       : name_(name), enabled_(enabled), needs_engine_(needs_engine), init_ok_(init_ok),
-        present_counter_(present_counter), shutdown_flag_(shutdown_flag), throw_init_(throw_init),
-        throw_present_(throw_present), throw_shutdown_(throw_shutdown) {}
+        present_counter_(present_counter), shutdown_flag_(shutdown_flag),
+        resize_counter_(resize_counter), throw_init_(throw_init), throw_present_(throw_present),
+        throw_shutdown_(throw_shutdown), throw_resize_(throw_resize) {}
 
   const char* name() const override { return name_; }
   bool requires_engine_hooks() const override { return needs_engine_; }
@@ -35,6 +36,14 @@ public:
       throw std::runtime_error("injected on_present failure");
     }
   }
+  void on_resize() override {
+    if (resize_counter_) {
+      ++(*resize_counter_);
+    }
+    if (throw_resize_) {
+      throw std::runtime_error("injected on_resize failure");
+    }
+  }
   void shutdown() override {
     if (shutdown_flag_) {
       *shutdown_flag_ = true;
@@ -51,9 +60,11 @@ private:
   bool init_ok_;
   int* present_counter_;
   bool* shutdown_flag_;
+  int* resize_counter_;
   bool throw_init_;
   bool throw_present_;
   bool throw_shutdown_;
+  bool throw_resize_;
 };
 
 } // namespace
@@ -137,4 +148,31 @@ TEST_CASE("module registry isolates exceptions in init, on_present, and shutdown
   CHECK(s_throw_shutdown);
   CHECK(s_healthy);
   CHECK(reg.active_count() == 0);
+}
+
+TEST_CASE("module registry dispatches on_resize and isolates exceptions") {
+  sf::ModuleRegistry reg;
+  int r_healthy = 0, r_throw = 0, r_off = 0;
+
+  reg.register_module(std::make_unique<StubModule>("healthy", true, false, true, nullptr, nullptr,
+                                                   false, false, false, &r_healthy, false));
+  reg.register_module(std::make_unique<StubModule>("throw_resize", true, false, true, nullptr,
+                                                   nullptr, false, false, false, &r_throw, true));
+  reg.register_module(std::make_unique<StubModule>("off", false, false, true, nullptr, nullptr,
+                                                   false, false, false, &r_off, false));
+
+  const auto profile = sf::games::ds3::resolve_profile("");
+  const auto cfg = sf::Config::defaults();
+  reg.init_all(profile, cfg);
+  REQUIRE(reg.active_count() == 2);
+
+  reg.on_resize();
+  reg.on_resize();
+
+  CHECK(r_healthy == 2);
+  CHECK(r_throw == 1);
+  CHECK(r_off == 0);
+  CHECK(reg.active_count() == 1);
+  CHECK_FALSE(reg.statuses()[1].active);
+  CHECK(reg.statuses()[1].detail == "disabled after exception in on_resize");
 }

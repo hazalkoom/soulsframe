@@ -1,5 +1,6 @@
 add_executable(soulsframe_unit_tests
   test_config.cpp
+  test_config_diagnostics.cpp
   test_content_hash.cpp
   test_fixed_step.cpp
   test_frame_pacer.cpp
