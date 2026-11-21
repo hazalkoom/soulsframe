@@ -2,6 +2,7 @@ add_executable(soulsframe_benchmarks
   main.cpp
   bench_frame_and_probe.cpp
   bench_hashing_and_scan.cpp
+  bench_m5_m9_pure.cpp
 )
 
 target_compile_options(soulsframe_benchmarks PRIVATE ${SF_WARN_FLAGS})
