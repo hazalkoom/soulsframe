@@ -1,4 +1,4 @@
-# 09. Codebase reference (M0–M8 FPS unlock research)
+# 09. Codebase reference (M0–M10 Polish & Release)
 
 This reference explains every directory, source file, and symbol currently implemented in the repository.
 
@@ -8,19 +8,20 @@ This reference explains every directory, source file, and symbol currently imple
 flowchart TD
   A["DarkSoulsIII.exe / testbed loads dinput8.dll"] --> B["DllMain (DLL_PROCESS_ATTACH)"]
   B --> C["Spawn init_thread (outside loader lock)"]
-  C --> D["sf::log::init() opens soulsframe.log"]
-  D --> E["sf::load_config_file(soulsframe.toml)"]
+  C --> D["sf::log::init() opens soulsframe.log (v0.10.0 banner)"]
+  D --> E["sf::load_config_file(soulsframe.toml) + set_level(log_level)"]
   E --> F{"general.mod_enabled?"}
   F -- no --> Z["Exit init_thread cleanly"]
   F -- yes --> G["sf::evaluate_offline_guard()"]
   G -- blocked --> Z
-  G -- allowed --> H["compute_host_exe_sha256() + resolve_profile()"]
+  G -- allowed --> H["compute_host_exe_sha256() + resolve_profile() + diagnose_config()"]
   H --> I["ModuleRegistry::init_all(profile, cfg)"]
   I --> J["FrameTelemetryModule::init() -> install_swapchain_hooks()"]
   I --> M["PresentationModule::init() -> FramePacer + CreateSwapChain flip hook"]
   I --> N["ParticleModule::init() -> ID3D11DeviceContext draw filter & viewport scale"]
   I --> U["UpscalerModule::init() -> D3DCompile FSR1/RCAS pass on Present()"]
   I --> F8["FpsUnlockModule::init() -> FixedStepStepper accumulator (dry-run when unverified)"]
+  I --> T["TextureModule::init() -> CreateTexture2D content-hash DDS swap"]
   I --> P["ProbeModule::init() [SF_PROBE=1] -> install_context_hooks()"]
   J --> K["hooked_present() ticks FrameStats & calls ModuleRegistry::on_present()"]
   M --> K
@@ -42,15 +43,18 @@ flowchart TD
 | [docker/wine-test.Dockerfile](../docker/wine-test.Dockerfile) | Headless Fedora 43 + Wine + Xvfb + Mesa container (`sf-wine-test`). |
 | [justfile](../justfile) | Task runner shortcuts (`img-build`, `build`, `probe`, `test-host`, `test-cov`, `bench`, `smoke`, `deploy`). |
 | [config/soulsframe.toml.example](../config/soulsframe.toml.example) | Default documented configuration template shipped to users (including `[probe]` settings). |
+| [config/presets/](../config/presets/) | M10 preset profiles (`safe-frame-pacing.toml`, `low-end-gpu.toml`, `probe-capture.toml`), all enforcing `offline_acknowledged = false`. |
 
 ## 3. Pure C++ modules (Linux-testable, no Win32/D3D11)
 
 | Module | Key symbols | Responsibility |
 |---|---|---|
 | [src/core/config.h](../src/core/config.h) / [.cpp](../src/core/config.cpp) | `sf::Config`, `sf::parse_config_toml()`, `sf::load_config_file()` | TOML parsing with bounds clamping, warning collection, and safe fallback on syntax errors. |
+| [src/core/config_diagnostics.h](../src/core/config_diagnostics.h) / [.cpp](../src/core/config_diagnostics.cpp) | `sf::diagnose_config()`, `sf::format_config_summary()`, `sf::ConfigDiagnostic` | Cross-field config validation and human-readable startup/CLI diagnostics (`SF_CFG_*`). |
+| [src/core/version.h](../src/core/version.h) | `sf::kVersionString`, `sf::kProductName` | Semantic version (`0.10.0`) synchronized with `CMakeLists.txt`. |
 | [src/core/offline_guard.h](../src/core/offline_guard.h) / [.cpp](../src/core/offline_guard.cpp) | `sf::OfflineCheckInput`, `sf::evaluate_offline_guard()` | Enforces explicit `offline_acknowledged = true` opt-in and rejects online flags/session state. |
-| [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features; uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
-| [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
+| [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features (`init`, `on_present`, `on_resize`, `shutdown`); uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
+| [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`, `on_resize`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
 | [src/core/sha256.h](../src/core/sha256.h) / [.cpp](../src/core/sha256.cpp) | `sf::sha256_bytes()`, `sf::sha256_hex()` | Zero-dependency SHA-256 implementation for executable version pinning. |
 | [src/timing/fixed_step.h](../src/timing/fixed_step.h) / [.cpp](../src/timing/fixed_step.cpp) | `sf::timing::FixedStepStepper`, `evaluate_fps_unlock_safety()` | Pure M8 60 Hz fixed-step simulation accumulator, spiral-of-death clamping, and dry-run build safety verdict. |
 | [src/timing/frame_pacer.h](../src/timing/frame_pacer.h) / [.cpp](../src/timing/frame_pacer.cpp) | `sf::timing::IPacerClock`, `sf::timing::FramePacer`, `sf::timing::PacerStats` | Pure hybrid sleep+spin frame-rate limiter (`[present] max_fps`) with cadence preservation and hitch recovery. |
@@ -75,7 +79,7 @@ flowchart TD
 | File | Key symbols | Responsibility |
 |---|---|---|
 | [src/core/proxy_dinput8.cpp](../src/core/proxy_dinput8.cpp) | `DirectInput8Create` | Exports `DirectInput8Create` and forwards calls to `%SystemRoot%\System32\dinput8.dll`. |
-| [src/core/log.h](../src/core/log.h) / [.cpp](../src/core/log.cpp) | `sf::log::init()`, `SF_LOG()`, `sf::log::module_dir()` | Thread-safe logger creating `soulsframe.log` alongside `dinput8.dll`. |
+| [src/core/log.h](../src/core/log.h) / [.cpp](../src/core/log.cpp) | `sf::log::init()`, `sf::log::set_level()`, `SF_LOG()`, `SF_LOG_WARN()`, `sf::log::module_dir()` | Thread-safe severity-filtered logger creating `soulsframe.log` alongside `dinput8.dll`. |
 | [src/core/win_helpers.h](../src/core/win_helpers.h) / [.cpp](../src/core/win_helpers.cpp) | `sf::WinClock`, `compute_host_exe_sha256()`, `detect_known_overlays()` | QPC monotonic clock, executable hashing, CLI tokenization, conflicting overlay detection. |
 | [src/gfx/d3d11/particle_module.h](../src/gfx/d3d11/particle_module.h) / [.cpp](../src/gfx/d3d11/particle_module.cpp) | `sf::gfx::ParticleModule`, `filter_d3d11_draw()`, `finish_d3d11_draw()` | M6 particle mitigation module: detects DS3 read-only-depth blended draws, caps overdraw/instance budgets, and applies temporary low-res viewport scaling (cooperates seamlessly with `SF_PROBE` hooks). |
 | [src/gfx/d3d11/presentation_module.h](../src/gfx/d3d11/presentation_module.h) / [.cpp](../src/gfx/d3d11/presentation_module.cpp) | `sf::gfx::PresentationModule` | M5 presentation & pacing module: hooks `IDXGIFactory::CreateSwapChain` (slot 10) for safe `FLIP_DISCARD` upgrades with automatic fallback, and drives `FramePacer` + `ALLOW_TEARING` in `on_present()`. |
@@ -86,7 +90,7 @@ flowchart TD
 | [src/gfx/d3d11/gpu_timer.h](../src/gfx/d3d11/gpu_timer.h) / [.cpp](../src/gfx/d3d11/gpu_timer.cpp) | `sf::gfx::GpuTimer`, `GpuFrameResult` | (`SF_PROBE=1` only) D3D11 `TIMESTAMP`/`TIMESTAMP_DISJOINT` queries in an 8-slot ring: one stamp per pass start plus end of frame, polled with `DONOTFLUSH` so the GPU is never stalled; degrades to no `gpu_ms` if queries are unsupported. |
 | [src/probe/probe_module.h](../src/probe/probe_module.h) / [.cpp](../src/probe/probe_module.cpp) | `sf::probe::ProbeModule` | (`SF_PROBE=1` only) `sf::Module` implementation bridging `context_hook` -> `TraceRecorder` -> background JSONL writer thread with loader-lock-safe shutdown and optional `MemDump`. |
 | [src/probe/win_dump.h](../src/probe/win_dump.h) / [.cpp](../src/probe/win_dump.cpp) | `sf::probe::dump_host_module_to_file()` | (`SF_PROBE=1` only) Read-only `VirtualQuery` memory dump + Ghidra section alignment fixup (`probe.dump_module`). |
-| [tools/cpp/sftool_main.cpp](../tools/cpp/sftool_main.cpp) | `sftool` (`builds hash`, `pe-info`, `pe-fixup`, `sigmaker`, `sigtest`) | Native Linux host CLI sharing `soulsframe_core` and `soulsframe_probe_core` for signature verification and PE dump analysis. |
+| [tools/cpp/sftool_main.cpp](../tools/cpp/sftool_main.cpp) | `sftool` (`version`, `config-check`, `builds hash`, `pe-info`, `pe-fixup`, `sigmaker`, `sigtest`) | Native Linux host CLI sharing `soulsframe_core` and `soulsframe_probe_core` for config validation, signature verification, and PE dump analysis. |
 | [src/core/dllmain.cpp](../src/core/dllmain.cpp) | `DllMain`, `init_thread`, `FrameTelemetryModule` | Spawns background initialization outside loader lock, registers active modules (`FrameTelemetryModule`, plus `ProbeModule` in `SF_PROBE`), and orchestrates clean shutdown. |
 
 - `src/gfx/d3d11/texture_module.{h,cpp}` — M9 `CreateTexture2D` detour swapping keyed textures from `pack_dir/manifest.txt` (`tools/py/bake_textures.py` builds packs).
