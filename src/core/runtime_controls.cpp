@@ -59,7 +59,7 @@ std::string to_lower_ascii(std::string_view sv) {
 const KeyBindingDef* find_key_binding(std::string_view lower) noexcept {
   const auto* const it = std::ranges::find_if(
       kKeyTable, [&](const KeyBindingDef& entry) { return entry.name == lower; });
-  return (it != kKeyTable.end()) ? &(*it) : nullptr;
+  return (it != kKeyTable.end()) ? it : nullptr;
 }
 
 } // namespace
