@@ -63,6 +63,7 @@ Capture 60-second runs in the same camera angle (e.g., Cemetery of Ash bonfire l
 | **M6 Particles** | `modules.particles = true` | Worst-case fog/fire scenes show lower GPU frame time in `analyze_capture.py` |
 | **M7 FSR 1 + Resize** | `modules.upscaler = true` (`fsr1`, `quality`) | Visual crispness check + `Alt+Enter` / resolution change logs `resizes=...` cleanly |
 | **M9 Texture Swap** | `modules.textures = true`, baked pack in `soulsframe_textures/` | Log shows `replaced > 0`, `invalid = 0`, zero hitching or visual corruption |
+| **M11 Overlay & Hotkeys** | `modules.overlay = true` (enabled in `safe-frame-pacing` and `low-end-gpu` presets) | HUD displays live FPS/1%-low; `F9` hides/shows HUD, `F10` pauses/resumes mod, `F11`/`F8`/`F12` toggle features live |
 
 Store verified logs and PresentMon summaries under `bench/` (remember never to commit `*.exe`, `*.dll`, or game files).
 

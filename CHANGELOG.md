@@ -7,6 +7,7 @@ All notable milestones implemented in SoulsFrame up to `v0.10.0` (pending final 
 ### Added
 
 - **Version source of truth (`0.10.0`):** Unified `CMakeLists.txt` (`project(soulsframe VERSION 0.10.0)`), `src/core/version.h`, DLL banners, `sf-probe` session headers, and `sftool version`.
+- **In-game FPS viewer & live hotkeys (`src/core/runtime_controls.{h,cpp}`, `src/gfx/fx/hud_overlay.{h,cpp}`, `src/gfx/d3d11/overlay_module.{h,cpp}`):** Built-in 8x8 bitmap FPS/avg-ms/1%-low + status badge HUD and debounced runtime toggles (`F9` HUD, `F10` master pause/resume bypass, `F11` FSR 1, `F8` particles, `F12` FPS cap) without restarting the game.
 - **Cross-field configuration diagnostics (`src/core/config_diagnostics.{h,cpp}`):** Detects inactive `[present]` settings, throttling no-ops, upscaler preset overrides, FPS cap conflicts, probe flags on release DLLs, and risky texture paths at startup and offline via `sftool config-check <toml> [--probe] [--verified-exe]`.
 - **Severity-filtered logging (`src/core/log.{h,cpp}`):** Actually enforces `general.log_level` (`debug`, `info`, `warn`, `error`) with `[DEBUG]`/`[INFO]`/`[WARN]`/`[ERROR]` tags across all modules.
 - **Swap-chain resize lifecycle (`sf::Module::on_resize()`, `ModuleRegistry::on_resize()`):** Ensures modules such as `UpscalerModule` release swap-chain backbuffer RTV/texture references before `IDXGISwapChain::ResizeBuffers` executes.

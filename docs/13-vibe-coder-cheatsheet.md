@@ -70,6 +70,26 @@ max_fps = 0
 frame_telemetry = true
 presentation = false
 probe_tracer = false
+particles = false
+upscaler = false
+fps_unlock = false
+textures = false
+overlay = false
+
+[overlay]
+show_fps = true
+show_status = true
+position = "top_left" # top_left, top_right, bottom_left, bottom_right
+scale = 2
+opacity_percent = 75
+
+[hotkeys]
+enabled = true
+toggle_overlay = "F9"
+toggle_mod = "F10"      # live master bypass without closing the game
+toggle_upscaler = "F11"
+toggle_particles = "F8"
+toggle_frame_cap = "F12"
 
 [probe]
 # Only used in SF_PROBE tracer builds.

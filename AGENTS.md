@@ -53,7 +53,8 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
 - **M5–M8:** **Implemented** — flip-model + frame pacer, particle mitigation, FSR 1 upscaler, fixed-step FPS unlock research.
 - **M9 (Texture swap & bake):** **Implemented** — pure `texture_pack` (keys/DDS/manifest/budget), `TextureModule` `CreateTexture2D` hook, `tools/py/bake_textures.py`.
 - **M10 (Polish & release):** **Implemented (`v0.10.0-rc`)** — `version.h`, `config_diagnostics`, `sftool version`/`config-check`, `log_level` filtering, `on_resize()` cleanup, `config/presets/*.toml`, Windows validation guide, and release workflow hardening.
-- **Next:** Real Windows 10/11 DS3 validation & A/B benchmarks, then in-game hotkeys/overlay.
+- **M11 (In-game FPS viewer & live hotkeys):** **Implemented** — pure `runtime_controls` + 8x8 bitmap `hud_overlay`, D3D11 `OverlayModule`, and live toggles (`F9` HUD, `F10` master bypass, `F11` FSR 1, `F8` particles, `F12` FPS cap).
+- **Next:** Real Windows 10/11 DS3 validation & A/B benchmarks.
 
 ## Commit & documentation workflow
 

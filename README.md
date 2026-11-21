@@ -1,6 +1,6 @@
 # SoulsFrame: Dark Souls III performance and frame-pacing mod
 
-> Status: **M0–M10 implemented (`v0.10.0-rc`; pending real Windows DS3 validation)** — proxy + SwapChain telemetry + `sf-probe` draw-call/GPU pass tracer + RE toolkit (`pe_dump`, `sig_db`, `sftool`, Ghidra) + flip-model frame pacer + particle mitigation + FSR 1 spatial upscaler + fixed-step FPS unlock research + offline texture-pack hash swap + config diagnostics, presets, and release packaging. Scope is **DS3 only**; Elden Ring comes later as a separate renderer backend (`docs/01`).
+> Status: **M0–M10 + M11 In-Game FPS Overlay/Hotkeys implemented (`v0.10.0-rc`; pending real Windows DS3 validation)** — proxy + SwapChain telemetry + `sf-probe` draw-call/GPU pass tracer + RE toolkit (`pe_dump`, `sig_db`, `sftool`, Ghidra) + flip-model frame pacer + particle mitigation + FSR 1 spatial upscaler + fixed-step FPS unlock research + offline texture-pack hash swap + live FPS HUD overlay & hotkeys (`F8`–`F12`) + config diagnostics and presets. Scope is **DS3 only**; Elden Ring comes later as a separate renderer backend (`docs/01`).
 > Dev host: Fedora Linux. Output: a Windows x64 `dinput8.dll` proxy mod, cross-compiled with MinGW-w64.
 
 ## What this is
