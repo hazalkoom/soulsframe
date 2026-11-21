@@ -85,10 +85,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Run stdlib telemetry self-tests
+      - name: Run stdlib telemetry and bake-tool self-tests
         run: |
           python3 tools/py/analyze_capture.py --self-test
           python3 tools/py/plot_gpu_passes.py --self-test
+          python3 tools/py/bake_textures.py --self-test
 
   static-analysis:
     if: needs.changes.outputs.heavy == 'true'

@@ -9,6 +9,7 @@ know which textures exist.
 Usage:
   bake_textures.py build <pack_dir>          # validate DDS files, write manifest.txt
   bake_textures.py keys <soulsframe.log>     # list keys dumped by TextureModule
+  bake_textures.py --self-test               # stdlib-only bake-tool validation
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ import argparse
 import re
 import struct
 import sys
+import tempfile
+import unittest
 from pathlib import Path
 
 KEY_RE = re.compile(r"^[0-9a-fA-F]{16}$")
@@ -93,13 +96,110 @@ def keys(log: Path) -> int:
     return 0
 
 
+def make_legacy_dds(fmt_fourcc: bytes, w: int = 4, h: int = 4, mips: int = 1) -> bytes:
+    """Build a minimal in-memory DXT1/DXT3/DXT5 DDS for self-tests."""
+    fmt = FOURCC.get(fmt_fourcc, 71)
+    payload_bytes = chain_bytes(fmt, w, h, mips)
+    buf = bytearray(128 + payload_bytes)
+    struct.pack_into("<I", buf, 0, 0x20534444)
+    struct.pack_into("<I", buf, 4, 124)
+    struct.pack_into("<II", buf, 12, h, w)
+    struct.pack_into("<I", buf, 28, mips)
+    struct.pack_into("<I", buf, 76, 32)
+    struct.pack_into("<I", buf, 80, 4)
+    buf[84:88] = fmt_fourcc
+    return bytes(buf)
+
+
+def make_dx10_dds(fmt: int, w: int = 4, h: int = 4, mips: int = 1) -> bytes:
+    """Build a minimal DX10 2D DDS for self-tests."""
+    payload_bytes = chain_bytes(fmt, w, h, mips)
+    buf = bytearray(148 + payload_bytes)
+    struct.pack_into("<I", buf, 0, 0x20534444)
+    struct.pack_into("<I", buf, 4, 124)
+    struct.pack_into("<II", buf, 12, h, w)
+    struct.pack_into("<I", buf, 28, mips)
+    struct.pack_into("<I", buf, 76, 32)
+    struct.pack_into("<I", buf, 80, 4)
+    buf[84:88] = b"DX10"
+    struct.pack_into("<IIII", buf, 128, fmt, 3, 0, 1)
+    return bytes(buf)
+
+
+def make_rgba8_dds(w: int = 4, h: int = 4, mips: int = 1) -> bytes:
+    """Build a minimal legacy RGBA8 DDS for self-tests."""
+    payload_bytes = chain_bytes(28, w, h, mips)
+    buf = bytearray(128 + payload_bytes)
+    struct.pack_into("<I", buf, 0, 0x20534444)
+    struct.pack_into("<I", buf, 4, 124)
+    struct.pack_into("<II", buf, 12, h, w)
+    struct.pack_into("<I", buf, 28, mips)
+    struct.pack_into("<I", buf, 76, 32)
+    struct.pack_into("<I", buf, 80, 0x40)
+    struct.pack_into("<I", buf, 88, 32)
+    struct.pack_into("<I", buf, 92, 0xFF)
+    return bytes(buf)
+
+
+class BakeTextureTests(unittest.TestCase):
+    def test_chain_bytes_and_formats(self) -> None:
+        self.assertEqual(chain_bytes(71, 4, 4, 1), 8)
+        self.assertEqual(chain_bytes(74, 4, 4, 1), 16)
+        self.assertEqual(chain_bytes(28, 4, 4, 1), 64)
+
+    def test_dxt1_dx10_rgba_headers(self) -> None:
+        self.assertIsNone(check_dds(make_legacy_dds(b"DXT1")))
+        self.assertIsNone(check_dds(make_dx10_dds(98)))
+        self.assertIsNone(check_dds(make_dx10_dds(99)))
+        self.assertIsNone(check_dds(make_rgba8_dds()))
+
+    def test_truncated_and_bad_magic_rejection(self) -> None:
+        self.assertIn("bad DDS header", check_dds(b"NOPE" + bytes(124)))
+        dxt1 = make_legacy_dds(b"DXT1")
+        self.assertIn("payload truncated", check_dds(dxt1[:-1]))
+        dx10 = make_dx10_dds(98)
+        self.assertIn("truncated DX10 header", check_dds(dx10[:140]))
+
+    def test_build_skips_nonhex_names_and_normalizes_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            pack = Path(tmp)
+            sub = pack / "sub"
+            sub.mkdir()
+            (sub / "0123456789abcdef.dds").write_bytes(make_legacy_dds(b"DXT1"))
+            (pack / "not-a-key.dds").write_bytes(make_legacy_dds(b"DXT1"))
+            self.assertEqual(build(pack), 0)
+            manifest = (pack / "manifest.txt").read_text(encoding="ascii")
+            self.assertIn("0123456789abcdef = sub/0123456789abcdef.dds", manifest)
+            self.assertNotIn("not-a-key", manifest)
+
+    def test_keys_and_relative_path_normalization(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "soulsframe.log"
+            log.write_text("TextureModule key deadbeef00000001 64x32 fmt=71 mips=4\n")
+            self.assertEqual(keys(log), 0)
+
+            rel = Path("sub") / "0123456789abcdef.dds"
+            self.assertEqual(rel.as_posix(), "sub/0123456789abcdef.dds")
+
+
+def run_self_test() -> int:
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(BakeTextureTests)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if result.wasSuccessful() else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    ap.add_argument("--self-test", action="store_true", help="Run stdlib-only validation tests")
+    sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("build").add_argument("pack_dir", type=Path)
     sub.add_parser("keys").add_argument("log", type=Path)
-    a = ap.parse_args()
-    return build(a.pack_dir) if a.cmd == "build" else keys(a.log)
+    args = ap.parse_args()
+    if args.self_test:
+        return run_self_test()
+    if args.cmd is None:
+        ap.error("a subcommand or --self-test is required")
+    return build(args.pack_dir) if args.cmd == "build" else keys(args.log)
 
 
 if __name__ == "__main__":
