@@ -2,6 +2,7 @@
 
 #include "tex/content_hash.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -204,10 +205,10 @@ bool is_safe_relative_path(std::string_view rel) noexcept {
   if (rel.empty() || rel.size() > 260U || rel.front() == '/' || rel.front() == '\\') {
     return false;
   }
-  for (const char c : rel) {
-    if (static_cast<unsigned char>(c) < 0x20U || c == ':' || c == 0x7F) {
-      return false;
-    }
+  if (std::ranges::any_of(rel, [](char c) {
+        return static_cast<unsigned char>(c) < 0x20U || c == ':' || c == 0x7F;
+      })) {
+    return false;
   }
   size_t start = 0;
   while (start <= rel.size()) {

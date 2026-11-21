@@ -160,10 +160,9 @@ HudBitmap rasterize_hud(const std::vector<std::string>& lines, bool mod_active,
   if (lines.empty()) {
     return {};
   }
-  size_t max_chars = 0U;
-  for (const auto& line : lines) {
-    max_chars = std::max(max_chars, line.size());
-  }
+  const auto longest = std::ranges::max_element(
+      lines, [](const std::string& a, const std::string& b) { return a.size() < b.size(); });
+  const size_t max_chars = longest->size();
   if (max_chars == 0U) {
     return {};
   }
