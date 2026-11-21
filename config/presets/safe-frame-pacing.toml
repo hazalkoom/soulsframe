@@ -1,0 +1,22 @@
+# SoulsFrame Preset -- Safe Frame Pacing (M5)
+# Copy next to DarkSoulsIII.exe / dinput8.dll as "soulsframe.toml" and set
+# offline_acknowledged = true when launching Dark Souls III strictly offline.
+# Zero visual modifications: only stabilizes DXGI flip-model presentation & frame pacing.
+
+[general]
+offline_acknowledged = false
+mod_enabled = true
+log_level = "info"
+
+[present]
+mode = "flip"
+max_fps = 60
+
+[modules]
+frame_telemetry = true
+presentation = true
+probe_tracer = false
+particles = false
+upscaler = false
+fps_unlock = false
+textures = false

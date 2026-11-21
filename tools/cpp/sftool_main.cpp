@@ -1,4 +1,8 @@
+#include "core/config.h"
+#include "core/config_diagnostics.h"
+#include "core/offline_guard.h"
 #include "core/sha256.h"
+#include "core/version.h"
 #include "games/ds3/sig_db.h"
 #include "hooks/sigscan.h"
 #include "probe/pe_dump.h"
@@ -89,13 +93,79 @@ std::optional<uint64_t> parse_hex_u64(std::string_view sv) {
 }
 
 void print_usage() {
-  std::cout << "sftool - SoulsFrame native RE & signature utility\n"
+  std::cout << "sftool - SoulsFrame native RE & config utility (v" << sf::kVersionString << ")\n"
             << "Usage:\n"
+            << "  sftool version\n"
+            << "  sftool config-check <soulsframe.toml> [--probe] [--verified-exe]\n"
             << "  sftool builds hash <file>\n"
             << "  sftool pe-info <file>\n"
             << "  sftool pe-fixup <in_dump> <out_pe> [runtime_base_hex]\n"
             << "  sftool sigmaker --image <file> --rva <hex> [--min-len <N>]\n"
             << "  sftool sigtest --image <file> --db <ds3_sigs.toml> [--sha256 <hex>]\n";
+}
+
+int cmd_version() {
+  std::cout << sf::kProductName << " sftool v" << sf::kVersionString << '\n';
+  return 0;
+}
+
+int cmd_config_check(int argc, char** argv) {
+  std::string cfg_path;
+  sf::DiagnosticContext diag_ctx{};
+
+  for (int i = 2; i < argc; ++i) {
+    const std::string_view arg(argv[i]);
+    if (arg == "--probe") {
+      diag_ctx.is_probe_build = true;
+    } else if (arg == "--verified-exe") {
+      diag_ctx.exe_hooks_allowed = true;
+    } else if (arg.starts_with('-')) {
+      std::cerr << "Unknown option: " << arg << '\n';
+      return 2;
+    } else if (cfg_path.empty()) {
+      cfg_path = std::string(arg);
+    } else {
+      std::cerr << "Unexpected argument: " << arg << '\n';
+      return 2;
+    }
+  }
+
+  if (cfg_path.empty()) {
+    std::cerr << "Usage: sftool config-check <soulsframe.toml> [--probe] [--verified-exe]\n";
+    return 2;
+  }
+
+  const auto valid_cfg = validate_cli_path(cfg_path, true);
+  if (!valid_cfg) {
+    std::cerr << "Invalid or unreadable config file path: " << cfg_path << '\n';
+    return 1;
+  }
+
+  const auto res = sf::load_config_file(valid_cfg->string());
+  std::cout << "File:    " << valid_cfg->string() << '\n'
+            << "Parse:   " << (res.parsed_ok ? "OK" : "FAILED (defaults applied)") << '\n'
+            << "Summary: " << sf::format_config_summary(res.config) << '\n';
+
+  for (const auto& w : res.warnings) {
+    std::cout << "  [PARSE WARN] " << w << '\n';
+  }
+
+  sf::OfflineCheckInput offline_in;
+  offline_in.config_offline_acknowledged = res.config.general.offline_acknowledged;
+  const auto verdict = sf::evaluate_offline_guard(offline_in);
+  std::cout << "Offline: " << (verdict.allowed ? "ALLOWED" : "BLOCKED") << " (" << verdict.reason
+            << ")\n";
+
+  const auto diags = sf::diagnose_config(res.config, diag_ctx);
+  bool has_error = !res.parsed_ok;
+  for (const auto& d : diags) {
+    if (d.severity == sf::DiagnosticSeverity::Error) {
+      has_error = true;
+    }
+    std::cout << "  [" << sf::severity_name(d.severity) << "] " << d.code << ": " << d.message
+              << '\n';
+  }
+  return has_error ? 1 : 0;
 }
 
 int cmd_builds_hash(int argc, char** argv) {
@@ -317,6 +387,12 @@ int main(int argc, char** argv) {
   if (cmd == "--help" || cmd == "-h") {
     print_usage();
     return 0;
+  }
+  if (cmd == "version" || cmd == "--version" || cmd == "-v") {
+    return cmd_version();
+  }
+  if (cmd == "config-check") {
+    return cmd_config_check(argc, argv);
   }
   if (cmd == "builds") {
     return cmd_builds_hash(argc, argv);

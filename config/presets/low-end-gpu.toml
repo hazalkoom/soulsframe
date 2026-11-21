@@ -1,0 +1,34 @@
+# SoulsFrame Preset -- Low-End GPU Boost (M5 + M6 + M7)
+# Copy next to DarkSoulsIII.exe / dinput8.dll as "soulsframe.toml" and set
+# offline_acknowledged = true when launching Dark Souls III strictly offline.
+# Enables flip-model frame pacing, half-res particle mitigation, and FSR 1 Quality upscaling.
+
+[general]
+offline_acknowledged = false
+mod_enabled = true
+log_level = "info"
+
+[present]
+mode = "flip"
+max_fps = 60
+
+[modules]
+frame_telemetry = true
+presentation = true
+probe_tracer = false
+particles = true
+upscaler = true
+fps_unlock = false
+textures = false
+
+[particles]
+mode = "auto"
+scale_percent = 50
+max_instances_per_draw = 128
+max_draws_per_frame = 0
+
+[upscaler]
+mode = "fsr1"
+preset = "quality"
+scale_percent = 67
+sharpness_percent = 80

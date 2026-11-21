@@ -1,0 +1,30 @@
+# SoulsFrame Preset -- SF_PROBE Telemetry Capture (M2 + M3)
+# Intended for win64-probe builds (requires dinput8.dll built with SF_PROBE=ON).
+# Copy next to DarkSoulsIII.exe / dinput8.dll as "soulsframe.toml" and set
+# offline_acknowledged = true when launching Dark Souls III strictly offline.
+
+[general]
+offline_acknowledged = false
+mod_enabled = true
+log_level = "info"
+
+[present]
+mode = "game"
+max_fps = 0
+
+[modules]
+frame_telemetry = true
+presentation = false
+probe_tracer = true
+particles = false
+upscaler = false
+fps_unlock = false
+textures = false
+
+[probe]
+capture_frames = 120
+output_file = "soulsframe_capture.jsonl"
+trace_resources = true
+gpu_timing = true
+dump_module = false
+dump_file = "soulsframe_mem_dump.exe"
