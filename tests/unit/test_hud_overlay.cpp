@@ -43,12 +43,12 @@ TEST_CASE("rasterize_hud produces crisp bordered RGBA8 panel") {
   CHECK(sf::gfx::fx::rasterize_hud({}, true, 75U).rgba.empty());
   CHECK(sf::gfx::fx::rasterize_hud({""}, true, 75U).rgba.empty());
 
-  const auto active_bmp = sf::gfx::fx::rasterize_hud({"SF v0.10.0", "MOD:ON"}, true, 80U);
-  CHECK(active_bmp.width == (10U * 8U) + 8U);
+  const auto active_bmp = sf::gfx::fx::rasterize_hud({"SF v1.0.0", "MOD:ON"}, true, 80U);
+  CHECK(active_bmp.width == (9U * 8U) + 8U);
   CHECK(active_bmp.height > 16U);
   CHECK(active_bmp.rgba.size() == static_cast<size_t>(active_bmp.width) * active_bmp.height);
 
-  const auto paused_bmp = sf::gfx::fx::rasterize_hud({"SF v0.10.0", "MOD:OFF"}, false, 80U);
+  const auto paused_bmp = sf::gfx::fx::rasterize_hud({"SF v1.0.0", "MOD:OFF"}, false, 80U);
   // Active and paused border accent colors differ on top-left corner pixel.
   CHECK(active_bmp.rgba[0] != paused_bmp.rgba[0]);
 }

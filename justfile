@@ -33,6 +33,9 @@ bench:
 smoke:
     {{run}} sf-wine-test bash scripts/smoke-test.sh
 
+package tag="v1.0.0":
+    bash scripts/package-release.sh {{tag}} out/release
+
 deploy preset="win64-release":
     cp "build/{{preset}}/dinput8.dll" "{{ds3}}/dinput8.dll"
     @echo "Steam launch option: WINEDLLOVERRIDES=\"dinput8=n,b\" %command%"

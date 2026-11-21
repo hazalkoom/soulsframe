@@ -21,7 +21,7 @@ particles = false
 upscaler = false
 fps_unlock = false
 textures = false
-overlay = false
+overlay = true
 
 [particles]
 # M6 particle overdraw mitigation: "auto", "throttle", or "half_res"

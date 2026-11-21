@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag or version name to package (e.g. v0.10.0)"
+        description: "Tag or version name to package (e.g. v1.0.0)"
         required: true
-        default: "v0.10.0"
+        default: "v1.0.0"
 
 permissions:
   contents: write
@@ -63,29 +63,14 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             TAG="${{ github.event.inputs.tag }}"
           fi
-          mkdir -p dist/release/presets dist/probe/presets dist/probe/tools artifacts
-
-          cp build/win64-release/dinput8.dll dist/release/
-          cp config/soulsframe.toml.example dist/release/soulsframe.toml
-          cp config/presets/*.toml dist/release/presets/
-          cp README.md CHANGELOG.md LICENSE THIRD_PARTY_LICENSES.txt dist/release/
-          cp docs/15-windows-validation-and-release.md dist/release/WINDOWS_SETUP.md
-          (cd dist/release && sha256sum dinput8.dll soulsframe.toml > SHA256SUMS.txt && zip -r "../../artifacts/soulsframe-${TAG}-win64.zip" .)
-
-          cp build/win64-probe/dinput8.dll dist/probe/
-          cp config/soulsframe.toml.example dist/probe/soulsframe.toml
-          cp config/presets/*.toml dist/probe/presets/
-          cp tools/py/bake_textures.py tools/py/analyze_capture.py dist/probe/tools/
-          cp README.md CHANGELOG.md LICENSE THIRD_PARTY_LICENSES.txt dist/probe/
-          cp docs/15-windows-validation-and-release.md dist/probe/WINDOWS_SETUP.md
-          (cd dist/probe && sha256sum dinput8.dll soulsframe.toml > SHA256SUMS.txt && zip -r "../../artifacts/soulsframe-${TAG}-win64-probe.zip" .)
-
-          (cd artifacts && sha256sum *.zip > SHA256SUMS.txt)
+          bash scripts/package-release.sh "${TAG}" artifacts
 
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages
-          path: artifacts/*
+          path: |
+            artifacts/*.zip
+            artifacts/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v7
         with:
@@ -132,19 +117,29 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             artifacts/*.zip
             artifacts/SHA256SUMS.txt
           body: |
             ## SoulsFrame ${{ github.ref_name }}
 
-            > **OFFLINE ONLY:** SoulsFrame hooks DirectX 11 at runtime. Never launch Dark Souls III online with `dinput8.dll` installed. By default `offline_acknowledged = false` in `soulsframe.toml` will block hooks until you explicitly opt in.
+            > **OFFLINE ONLY:** SoulsFrame hooks DirectX 11 at runtime. Never launch Dark Souls III online with `dinput8.dll` installed. Switch Steam / Dark Souls III to **Offline Mode** first.
 
-            ### Installation
-            1. Extract `dinput8.dll` and `soulsframe.toml` next to `DarkSoulsIII.exe`.
-            2. Edit `soulsframe.toml` and set `offline_acknowledged = true`.
-            3. (Steam/Proton on Linux) Set launch option: `WINEDLLOVERRIDES="dinput8=n,b" %command%`.
-            4. Launch offline and inspect `soulsframe.log`.
+            ### Quick Installation (Step-by-Step)
+            1. Download **`soulsframe-${{ github.ref_name }}-win64.zip`** below and extract all files directly into your Dark Souls III `Game` folder (next to `DarkSoulsIII.exe`).
+            2. *(Optional)* To use a preset, copy a file from `presets/` next to `DarkSoulsIII.exe` and rename it to `soulsframe.toml` (for weak/integrated GPUs, use `presets/low-end-gpu.toml`).
+            3. Open `soulsframe.toml` in Notepad and set `offline_acknowledged = true`.
+            4. *(Linux / Steam Deck Proton only)* Set Steam launch option: `WINEDLLOVERRIDES="dinput8=n,b" %command%`.
+            5. Launch Dark Souls III **offline**. Full 1-by-1 instructions are also included inside `README.txt` in the zip.
+
+            ### In-Game Hotkeys
+            | Key | Action |
+            |---|---|
+            | `F9` | Show / hide the FPS viewer & hotkey status HUD |
+            | `F10` | Live master ON/OFF pause toggle (without restarting the game) |
+            | `F11` | Toggle FSR 1 upscaling & sharpening ON/OFF (when `upscaler = true`) |
+            | `F8` | Toggle particle lag reduction ON/OFF (when `particles = true`) |
+            | `F12` | Toggle FPS cap ON/OFF (when `presentation = true` and `max_fps > 0`) |
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

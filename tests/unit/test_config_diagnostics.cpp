@@ -18,9 +18,10 @@ bool has_code(const std::vector<sf::ConfigDiagnostic>& diags, std::string_view c
 } // namespace
 
 TEST_CASE("version constants and format_config_summary are well formed") {
-  CHECK(sf::kVersionMajor == 0U);
-  CHECK(sf::kVersionMinor == 10U);
-  CHECK(std::string_view(sf::kVersionString) == "0.10.0");
+  CHECK(sf::kVersionMajor == 1U);
+  CHECK(sf::kVersionMinor == 0U);
+  CHECK(sf::kVersionPatch == 0U);
+  CHECK(std::string_view(sf::kVersionString) == "1.0.0");
   CHECK(std::string_view(sf::kProductName) == "SoulsFrame");
 
   CHECK(std::string_view(sf::severity_name(sf::DiagnosticSeverity::Info)) == "INFO");

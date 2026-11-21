@@ -1,4 +1,4 @@
-# 15. Real Windows Validation & Release Checklist (`v0.10.0`)
+# 15. Real Windows Validation & Release Checklist (`v1.0.0`)
 
 Proton/Wine + DXVK validates DXGI hooks, D3D11 pass detection, and shader compilation logic, but Proton replaces Microsoft's DXGI swap-chain scheduler and driver query behavior. Always run final validation on **real Windows 10/11** with **Dark Souls III** strictly **offline** before cutting an end-user release.
 
@@ -6,7 +6,7 @@ Proton/Wine + DXVK validates DXGI hooks, D3D11 pass detection, and shader compil
 
 ## 1. Windows installation & offline safety verification
 
-1. Download or build `soulsframe-v0.10.0-win64.zip` (or use `win64-probe` when capturing frame data).
+1. Download or build `soulsframe-v1.0.0-win64.zip` (or use `win64-probe` when capturing frame data).
 2. Extract `dinput8.dll` and `soulsframe.toml` (or one of the files from `presets/`) into the directory containing `DarkSoulsIII.exe` (for example `...\SteamLibrary\steamapps\common\DARK SOULS III\Game`).
 3. Verify the safety guard **before** acknowledging offline mode:
    - Leave `offline_acknowledged = false` in `soulsframe.toml`, launch DS3 offline, and exit at the title screen.
@@ -69,15 +69,15 @@ Store verified logs and PresentMon summaries under `bench/` (remember never to c
 
 ---
 
-## 5. Cutting a GitHub Release (`v0.10.0`)
+## 5. Cutting a GitHub Release (`v1.0.0`)
 
 1. Confirm all CI checks pass on `main` (`guards`, `docs`, `static-analysis`, `host-tests`, `benchmarks`, `coverage`, `fuzz-smoke`, `win64`, `wine-smoke`, `docker-verify`, `security`, `CodeQL`).
 2. Confirm clean git status and run local final checks (`check-guards.sh`, `host-tests`, `win64-release`, `win64-probe`, Wine `smoke-test.sh`).
-3. Create and push an annotated SemVer tag matching `CMakeLists.txt` (`project(soulsframe VERSION 0.10.0 ...)`):
+3. Create and push an annotated SemVer tag matching `CMakeLists.txt` (`project(soulsframe VERSION 1.0.0 ...)`):
 
    ```bash
-   git tag -a v0.10.0 -m "SoulsFrame v0.10.0"
-   git push origin v0.10.0
+   git tag -a v1.0.0 -m "SoulsFrame v1.0.0"
+   git push origin v1.0.0
    ```
 
-4. Monitor [.github/workflows/release.yml](../.github/workflows/release.yml) until `build-and-package`, `smoke-verify`, and `publish-release` complete with signed build provenance attestations (`soulsframe-v0.10.0-win64.zip` and `soulsframe-v0.10.0-win64-probe.zip`).
+4. Monitor [.github/workflows/release.yml](../.github/workflows/release.yml) until `build-and-package`, `smoke-verify`, and `publish-release` complete with signed build provenance attestations (`soulsframe-v1.0.0-win64.zip` and `soulsframe-v1.0.0-win64-probe.zip`).

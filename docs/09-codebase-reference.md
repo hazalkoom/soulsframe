@@ -8,7 +8,7 @@ This reference explains every directory, source file, and symbol currently imple
 flowchart TD
   A["DarkSoulsIII.exe / testbed loads dinput8.dll"] --> B["DllMain (DLL_PROCESS_ATTACH)"]
   B --> C["Spawn init_thread (outside loader lock)"]
-  C --> D["sf::log::init() opens soulsframe.log (v0.10.0 banner)"]
+  C --> D["sf::log::init() opens soulsframe.log (v1.0.0 banner)"]
   D --> E["sf::load_config_file(soulsframe.toml) + set_level(log_level)"]
   E --> F{"general.mod_enabled?"}
   F -- no --> Z["Exit init_thread cleanly"]
@@ -52,7 +52,7 @@ flowchart TD
 | [src/core/config.h](../src/core/config.h) / [.cpp](../src/core/config.cpp) | `sf::Config`, `sf::parse_config_toml()`, `sf::load_config_file()` | TOML parsing with bounds clamping, warning collection, and safe fallback on syntax errors. |
 | [src/core/config_diagnostics.h](../src/core/config_diagnostics.h) / [.cpp](../src/core/config_diagnostics.cpp) | `sf::diagnose_config()`, `sf::format_config_summary()`, `sf::ConfigDiagnostic` | Cross-field config validation and human-readable startup/CLI diagnostics (`SF_CFG_*`). |
 | [src/core/runtime_controls.h](../src/core/runtime_controls.h) / [.cpp](../src/core/runtime_controls.cpp) | `sf::RuntimeControlState`, `sf::HotkeyTracker`, `sf::parse_virtual_key()` | Lock-free live feature toggle flags and debounced rising-edge hotkey state machine. |
-| [src/core/version.h](../src/core/version.h) | `sf::kVersionString`, `sf::kProductName` | Semantic version (`0.10.0`) synchronized with `CMakeLists.txt`. |
+| [src/core/version.h](../src/core/version.h) | `sf::kVersionString`, `sf::kProductName` | Semantic version (`1.0.0`) synchronized with `CMakeLists.txt`. |
 | [src/core/offline_guard.h](../src/core/offline_guard.h) / [.cpp](../src/core/offline_guard.cpp) | `sf::OfflineCheckInput`, `sf::evaluate_offline_guard()` | Enforces explicit `offline_acknowledged = true` opt-in and rejects online flags/session state. |
 | [src/core/module.h](../src/core/module.h) | `sf::Module`, `sf::PresentCtx` | Plugin interface for features (`init`, `on_present`, `on_resize`, `shutdown`); uses opaque `void* swap_chain` to keep core decoupled from D3D11. |
 | [src/core/module_registry.h](../src/core/module_registry.h) / [.cpp](../src/core/module_registry.cpp) | `sf::ModuleRegistry`, `sf::ModuleStatus` | Initializes, updates (`on_present`, `on_resize`), and shuts down modules independently with exception isolation, config kill switches, and `requires_engine_hooks()` checks. |
