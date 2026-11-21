@@ -56,6 +56,12 @@ std::string to_lower_ascii(std::string_view sv) {
   return out;
 }
 
+const KeyBindingDef* find_key_binding(std::string_view lower) noexcept {
+  const auto it = std::ranges::find_if(
+      kKeyTable, [&](const KeyBindingDef& entry) { return entry.name == lower; });
+  return (it != kKeyTable.end()) ? &(*it) : nullptr;
+}
+
 } // namespace
 
 const char* hotkey_action_name(HotkeyAction action) noexcept {
@@ -79,12 +85,8 @@ uint32_t parse_virtual_key(std::string_view name) noexcept {
   if (lower == "none") {
     return 0U;
   }
-  for (const auto& entry : kKeyTable) {
-    if (entry.name == lower) {
-      return entry.vk;
-    }
-  }
-  return 0U;
+  const KeyBindingDef* entry = find_key_binding(lower);
+  return (entry != nullptr) ? entry->vk : 0U;
 }
 
 bool is_valid_hotkey_name(std::string_view name) noexcept {
@@ -96,13 +98,8 @@ bool is_valid_hotkey_name(std::string_view name) noexcept {
 }
 
 std::string canonical_hotkey_label(std::string_view name) {
-  const std::string lower = to_lower_ascii(name);
-  for (const auto& entry : kKeyTable) {
-    if (entry.name == lower) {
-      return std::string(entry.badge);
-    }
-  }
-  return "OFF";
+  const KeyBindingDef* entry = find_key_binding(to_lower_ascii(name));
+  return (entry != nullptr) ? std::string(entry->badge) : "OFF";
 }
 
 void RuntimeControlState::reset_from_config(const Config& cfg) noexcept {

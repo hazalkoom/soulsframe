@@ -2,7 +2,9 @@
 
 #include "core/runtime_controls.h"
 
+#include <algorithm>
 #include <array>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -22,12 +24,9 @@ uint32_t expected_preset_scale_percent(std::string_view preset) noexcept {
       {.name = "balanced", .scale = 59U},
       {.name = "performance", .scale = 50U},
   }};
-  for (const auto& entry : kTable) {
-    if (entry.name == preset) {
-      return entry.scale;
-    }
-  }
-  return 0U;
+  const auto it =
+      std::ranges::find_if(kTable, [&](const PresetScale& entry) { return entry.name == preset; });
+  return (it != kTable.end()) ? it->scale : 0U;
 }
 
 } // namespace
@@ -158,16 +157,13 @@ std::vector<ConfigDiagnostic> diagnose_config(const Config& cfg, const Diagnosti
         parse_virtual_key(cfg.hotkeys.toggle_frame_cap),
     }};
     bool dup_found = false;
+    const auto vk_span = std::span{vks};
     for (size_t i = 0U; i < vks.size() && !dup_found; ++i) {
       if (vks[i] == 0U) {
         continue;
       }
-      for (size_t j = i + 1U; j < vks.size(); ++j) {
-        if (vks[i] == vks[j]) {
-          dup_found = true;
-          break;
-        }
-      }
+      dup_found =
+          std::ranges::any_of(vk_span.subspan(i + 1U), [&](uint32_t vk) { return vk == vks[i]; });
     }
     if (dup_found) {
       diags.push_back({.severity = DiagnosticSeverity::Warning,
