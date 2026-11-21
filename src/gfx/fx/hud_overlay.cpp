@@ -171,8 +171,8 @@ HudBitmap rasterize_hud(const std::vector<std::string>& lines, bool mod_active,
   constexpr uint32_t kPadX = 4U;
   constexpr uint32_t kPadY = 4U;
   constexpr uint32_t kLineStep = 10U;
-  const uint32_t width = static_cast<uint32_t>(max_chars) * 8U + (kPadX * 2U);
-  const uint32_t height = static_cast<uint32_t>(lines.size()) * kLineStep - 2U + (kPadY * 2U);
+  const uint32_t width = (static_cast<uint32_t>(max_chars) * 8U) + (kPadX * 2U);
+  const uint32_t height = ((static_cast<uint32_t>(lines.size()) * kLineStep) - 2U) + (kPadY * 2U);
 
   const uint32_t clamped_opacity = std::min(opacity_percent, 100U);
   const auto bg_alpha = static_cast<uint8_t>((clamped_opacity * 235U) / 100U);
@@ -190,22 +190,22 @@ HudBitmap rasterize_hud(const std::vector<std::string>& lines, bool mod_active,
 
   for (uint32_t x = 0U; x < width; ++x) {
     bmp.rgba[x] = border_color;
-    bmp.rgba[static_cast<size_t>(height - 1U) * width + x] = border_color;
+    bmp.rgba[(static_cast<size_t>(height - 1U) * width) + x] = border_color;
   }
   for (uint32_t y = 0U; y < height; ++y) {
     bmp.rgba[static_cast<size_t>(y) * width] = border_color;
-    bmp.rgba[static_cast<size_t>(y) * width + (width - 1U)] = border_color;
+    bmp.rgba[(static_cast<size_t>(y) * width) + (width - 1U)] = border_color;
   }
 
   for (size_t line_idx = 0U; line_idx < lines.size(); ++line_idx) {
     const uint32_t fg = (line_idx == 0U) ? primary_text : secondary_text;
-    const uint32_t base_y = kPadY + static_cast<uint32_t>(line_idx) * kLineStep;
+    const uint32_t base_y = kPadY + (static_cast<uint32_t>(line_idx) * kLineStep);
     const std::string& text = lines[line_idx];
     for (size_t col_idx = 0U; col_idx < text.size(); ++col_idx) {
       const auto ch = static_cast<unsigned char>(text[col_idx]);
       const size_t glyph_idx = (ch >= 0x20U && ch <= 0x7EU) ? static_cast<size_t>(ch - 0x20U) : 0U;
       const auto& glyph = kFont8x8[glyph_idx];
-      const uint32_t base_x = kPadX + static_cast<uint32_t>(col_idx) * 8U;
+      const uint32_t base_x = kPadX + (static_cast<uint32_t>(col_idx) * 8U);
 
       for (uint32_t row = 0U; row < 8U; ++row) {
         const uint8_t bits = glyph[row];
@@ -216,10 +216,10 @@ HudBitmap rasterize_hud(const std::vector<std::string>& lines, bool mod_active,
           const uint32_t px = base_x + col;
           const uint32_t py = base_y + row;
           if (px + 1U < width && py + 1U < height) {
-            bmp.rgba[static_cast<size_t>(py + 1U) * width + (px + 1U)] = shadow_color;
+            bmp.rgba[(static_cast<size_t>(py + 1U) * width) + (px + 1U)] = shadow_color;
           }
           if (px < width && py < height) {
-            bmp.rgba[static_cast<size_t>(py) * width + px] = fg;
+            bmp.rgba[(static_cast<size_t>(py) * width) + px] = fg;
           }
         }
       }
@@ -239,9 +239,9 @@ HudRect compute_hud_rect(uint32_t backbuffer_w, uint32_t backbuffer_h, uint32_t 
   uint32_t draw_h = bmp_h * clamped_scale;
 
   const uint32_t avail_w =
-      (backbuffer_w > margin_px * 2U) ? (backbuffer_w - margin_px * 2U) : backbuffer_w;
+      (backbuffer_w > (margin_px * 2U)) ? (backbuffer_w - (margin_px * 2U)) : backbuffer_w;
   const uint32_t avail_h =
-      (backbuffer_h > margin_px * 2U) ? (backbuffer_h - margin_px * 2U) : backbuffer_h;
+      (backbuffer_h > (margin_px * 2U)) ? (backbuffer_h - (margin_px * 2U)) : backbuffer_h;
   if (draw_w > avail_w) {
     draw_h = std::max(1U, (draw_h * avail_w) / draw_w);
     draw_w = avail_w;
@@ -254,8 +254,8 @@ HudRect compute_hud_rect(uint32_t backbuffer_w, uint32_t backbuffer_h, uint32_t 
   const uint32_t eff_margin_x = (draw_w + margin_px <= backbuffer_w) ? margin_px : 0U;
   const uint32_t eff_margin_y = (draw_h + margin_px <= backbuffer_h) ? margin_px : 0U;
 
-  float x = static_cast<float>(eff_margin_x);
-  float y = static_cast<float>(eff_margin_y);
+  auto x = static_cast<float>(eff_margin_x);
+  auto y = static_cast<float>(eff_margin_y);
   if (position == "top_right" || position == "bottom_right") {
     x = static_cast<float>(backbuffer_w - draw_w - eff_margin_x);
   }

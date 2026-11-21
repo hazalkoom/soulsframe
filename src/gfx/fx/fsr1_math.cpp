@@ -62,22 +62,22 @@ EasuConstants compute_easu_constants(uint32_t input_width, uint32_t input_height
     return out;
   }
 
-  const float in_w = static_cast<float>(input_width);
-  const float in_h = static_cast<float>(input_height);
-  const float cont_w = static_cast<float>(container_width);
-  const float cont_h = static_cast<float>(container_height);
-  const float out_w = static_cast<float>(output_width);
-  const float out_h = static_cast<float>(output_height);
+  const auto in_w = static_cast<float>(input_width);
+  const auto in_h = static_cast<float>(input_height);
+  const auto cont_w = static_cast<float>(container_width);
+  const auto cont_h = static_cast<float>(container_height);
+  const auto out_w = static_cast<float>(output_width);
+  const auto out_h = static_cast<float>(output_height);
 
   // Mapping from output pixel center -> input texture space (AMD FsrEasuCon).
-  out.con0 = {in_w / out_w, in_h / out_h, (0.5f * (in_w / out_w)) - 0.5f,
-              (0.5f * (in_h / out_h)) - 0.5f};
+  out.con0 = {in_w / out_w, in_h / out_h, (0.5F * (in_w / out_w)) - 0.5F,
+              (0.5F * (in_h / out_h)) - 0.5F};
 
-  const float inv_w = 1.0f / cont_w;
-  const float inv_h = 1.0f / cont_h;
-  out.con1 = {inv_w, inv_h, 1.0f * inv_w, -1.0f * inv_h};
-  out.con2 = {-1.0f * inv_w, 2.0f * inv_h, 1.0f * inv_w, 2.0f * inv_h};
-  out.con3 = {0.0f, 4.0f * inv_h, 0.0f, 0.0f};
+  const float inv_w = 1.0F / cont_w;
+  const float inv_h = 1.0F / cont_h;
+  out.con1 = {inv_w, inv_h, 1.0F * inv_w, -1.0F * inv_h};
+  out.con2 = {-1.0F * inv_w, 2.0F * inv_h, 1.0F * inv_w, 2.0F * inv_h};
+  out.con3 = {0.0F, 4.0F * inv_h, 0.0F, 0.0F};
   return out;
 }
 
@@ -85,12 +85,12 @@ RcasConstants compute_rcas_constants(uint32_t display_width, uint32_t display_he
                                      uint32_t sharpness_percent) noexcept {
   RcasConstants out{};
   const uint32_t clamped = std::clamp(sharpness_percent, 0U, 100U);
-  const float stops = 2.0f * (1.0f - (static_cast<float>(clamped) / 100.0f));
+  const float stops = 2.0F * (1.0F - (static_cast<float>(clamped) / 100.0F));
   const float sharpness = std::exp2(-stops);
 
   out.con0[0] = sharpness;
-  out.con0[1] = (display_width > 0U) ? (1.0f / static_cast<float>(display_width)) : 0.0f;
-  out.con0[2] = (display_height > 0U) ? (1.0f / static_cast<float>(display_height)) : 0.0f;
+  out.con0[1] = (display_width > 0U) ? (1.0F / static_cast<float>(display_width)) : 0.0F;
+  out.con0[2] = (display_height > 0U) ? (1.0F / static_cast<float>(display_height)) : 0.0F;
   out.con0[3] = stops;
   return out;
 }

@@ -67,9 +67,9 @@ SimStepResult FixedStepStepper::advance(double raw_delta_ms) noexcept {
           : raw_delta_ms;
 
   const double fixed_dt_ms = 1000.0 / static_cast<double>(cfg_.sim_tick_hz);
-  const float fixed_dt_sec = 1.0f / static_cast<float>(cfg_.sim_tick_hz);
+  const float fixed_dt_sec = 1.0F / static_cast<float>(cfg_.sim_tick_hz);
   const float camera_dt_sec =
-      std::clamp(static_cast<float>(safe_delta_ms / 1000.0), 1.0f / 360.0f, 1.0f / 15.0f);
+      std::clamp(static_cast<float>(safe_delta_ms / 1000.0), 1.0F / 360.0F, 1.0F / 15.0F);
 
   const double max_accum_ms = static_cast<double>(cfg_.max_substeps) * fixed_dt_ms;
 
@@ -79,7 +79,7 @@ SimStepResult FixedStepStepper::advance(double raw_delta_ms) noexcept {
   if (strategy_ == FpsStrategy::VariableDt) {
     res.sim_ticks = 1U;
     res.sim_dt_sec = camera_dt_sec;
-    res.interpolation_alpha = 1.0f;
+    res.interpolation_alpha = 1.0F;
     res.clamped_spiral = (safe_delta_ms > max_accum_ms);
   } else {
     accumulator_ms_ += safe_delta_ms;
@@ -89,12 +89,12 @@ SimStepResult FixedStepStepper::advance(double raw_delta_ms) noexcept {
       ++stats_.spiral_clamps;
     }
 
-    const uint32_t ticks = static_cast<uint32_t>(accumulator_ms_ / fixed_dt_ms);
+    const auto ticks = static_cast<uint32_t>(accumulator_ms_ / fixed_dt_ms);
     accumulator_ms_ -= static_cast<double>(ticks) * fixed_dt_ms;
     res.sim_ticks = ticks;
     res.sim_dt_sec = fixed_dt_sec;
     res.interpolation_alpha =
-        std::clamp(static_cast<float>(accumulator_ms_ / fixed_dt_ms), 0.0f, 1.0f);
+        std::clamp(static_cast<float>(accumulator_ms_ / fixed_dt_ms), 0.0F, 1.0F);
   }
 
   if (res.clamped_spiral && strategy_ == FpsStrategy::VariableDt) {

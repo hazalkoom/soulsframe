@@ -30,7 +30,7 @@ LowResViewport compute_low_res_viewport(uint32_t width, uint32_t height,
   LowResViewport out{};
   out.full_width = width;
   out.full_height = height;
-  out.scale_factor = static_cast<float>(clamped_pct) / 100.0f;
+  out.scale_factor = static_cast<float>(clamped_pct) / 100.0F;
 
   if (width == 0U || height == 0U) {
     return out;

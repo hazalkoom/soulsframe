@@ -62,7 +62,7 @@ uint64_t FramePacer::pace(IPacerClock& clock) {
       break;
     }
     const uint64_t sleep_budget_ns = remaining_ns - spin_margin_ns_;
-    const uint32_t sleep_ms =
+    const auto sleep_ms =
         static_cast<uint32_t>(std::max<uint64_t>(1ULL, sleep_budget_ns / kNsPerMillisecond));
     clock.sleep_ms(sleep_ms);
     ++stats_.sleep_calls;
