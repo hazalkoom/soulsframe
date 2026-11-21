@@ -24,7 +24,7 @@ uint32_t expected_preset_scale_percent(std::string_view preset) noexcept {
       {.name = "balanced", .scale = 59U},
       {.name = "performance", .scale = 50U},
   }};
-  const auto it =
+  const auto* const it =
       std::ranges::find_if(kTable, [&](const PresetScale& entry) { return entry.name == preset; });
   return (it != kTable.end()) ? it->scale : 0U;
 }
