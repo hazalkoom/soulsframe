@@ -116,6 +116,59 @@ TEST_CASE("diagnose_config reports all mismatch and safety codes") {
   }
 }
 
+TEST_CASE("diagnose_config covers every diagnostic code and preset branch") {
+  sf::Config cfg = sf::Config::defaults();
+  cfg.general.mod_enabled = true;
+  cfg.general.offline_acknowledged = false;
+  cfg.modules.frame_telemetry = false;
+  cfg.modules.presentation = true;
+  cfg.present.mode = "flip";
+  cfg.present.max_fps = 60U;
+  cfg.modules.particles = true;
+  cfg.particles.mode = "throttle";
+  cfg.particles.max_instances_per_draw = 0U;
+  cfg.particles.max_draws_per_frame = 0U;
+  cfg.modules.upscaler = true;
+  cfg.upscaler.mode = "none";
+  cfg.upscaler.preset = "quality";
+  cfg.upscaler.scale_percent = 77U;
+  cfg.modules.fps_unlock = true;
+  cfg.fps_unlock.target_fps = 120U;
+  cfg.modules.probe_tracer = true;
+  cfg.modules.textures = true;
+  cfg.textures.dump_keys = true;
+  cfg.textures.pack_dir = "C:\\textures";
+
+  const auto verified =
+      sf::diagnose_config(cfg, {.is_probe_build = false, .exe_hooks_allowed = true});
+  CHECK(has_code(verified, "SF_CFG_OFFLINE_UNACK", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_TELEMETRY_OFF_WITH_PRESENT_MODS", sf::DiagnosticSeverity::Info));
+  CHECK(has_code(verified, "SF_CFG_PARTICLES_THROTTLE_NOOP", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_UPSCALER_MODE_NONE", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_UPSCALER_PRESET_OVERRIDES_SCALE", sf::DiagnosticSeverity::Info));
+  CHECK(has_code(verified, "SF_CFG_FPS_UNLOCK_EXPERIMENTAL", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_FPS_CAP_CONFLICT", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_PROBE_ON_RELEASE", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(verified, "SF_CFG_TEXTURES_DUMP_KEYS", sf::DiagnosticSeverity::Info));
+  CHECK(has_code(verified, "SF_CFG_TEXTURES_PACK_DIR_ABS", sf::DiagnosticSeverity::Warning));
+
+  const auto unverified =
+      sf::diagnose_config(cfg, {.is_probe_build = true, .exe_hooks_allowed = false});
+  CHECK_FALSE(has_code(unverified, "SF_CFG_PROBE_ON_RELEASE", sf::DiagnosticSeverity::Warning));
+  CHECK(has_code(unverified, "SF_CFG_FPS_UNLOCK_EXPERIMENTAL", sf::DiagnosticSeverity::Warning));
+
+  cfg.upscaler.preset = "custom";
+  cfg.upscaler.scale_percent = 53U;
+  const auto custom = sf::diagnose_config(cfg);
+  CHECK_FALSE(
+      has_code(custom, "SF_CFG_UPSCALER_PRESET_OVERRIDES_SCALE", sf::DiagnosticSeverity::Info));
+
+  cfg.upscaler.preset = "unknown-preset";
+  const auto unknown = sf::diagnose_config(cfg);
+  CHECK_FALSE(
+      has_code(unknown, "SF_CFG_UPSCALER_PRESET_OVERRIDES_SCALE", sf::DiagnosticSeverity::Info));
+}
+
 TEST_CASE("bundled config template and presets stay safe and parse without warnings") {
   namespace fs = std::filesystem;
   const fs::path cwd = fs::current_path();

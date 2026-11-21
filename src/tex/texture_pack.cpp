@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 namespace sf::tex {
 
@@ -281,6 +282,10 @@ Manifest parse_manifest(std::string_view text) {
 
 bool TextureSwapPolicy::try_reserve(uint64_t bytes) noexcept {
   if (budget_ != 0U && (bytes > budget_ || stats_.bytes_loaded > budget_ - bytes)) {
+    ++stats_.over_budget;
+    return false;
+  }
+  if (budget_ == 0U && bytes > std::numeric_limits<uint64_t>::max() - stats_.bytes_loaded) {
     ++stats_.over_budget;
     return false;
   }

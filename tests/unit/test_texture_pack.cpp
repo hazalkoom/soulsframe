@@ -1,7 +1,10 @@
 #include "tex/texture_pack.h"
 
+#include <array>
+#include <cstdint>
 #include <cstring>
 #include <doctest/doctest.h>
+#include <limits>
 #include <vector>
 
 using namespace sf::tex;
@@ -73,6 +76,73 @@ TEST_CASE("texture key depends on bytes and descriptor") {
   TextureDesc d3 = d1;
   d3.mip_levels = 4;
   CHECK(compute_texture_key(d1, a) == compute_texture_key(d3, a));
+}
+
+TEST_CASE("format helpers cover BC2 through BC7 and sRGB DXGI formats") {
+  const std::array<uint32_t, 12> kBcFormats = {74U, 75U, 77U, 78U, 80U, 81U,
+                                               83U, 84U, 95U, 96U, 98U, 99U};
+  for (const uint32_t fmt : kBcFormats) {
+    CHECK(is_supported_format(fmt));
+    CHECK(bc_block_bytes(fmt) != 0U);
+  }
+  CHECK(bc_block_bytes(71U) == 8U);
+  CHECK(bc_block_bytes(72U) == 8U);
+  CHECK(pixel_bytes(29U) == 4U);
+  CHECK(pixel_bytes(91U) == 4U);
+
+  CHECK(mip_row_count(74U, 5U) == 2U);
+  CHECK(mip_row_pitch(98U, 5U) == 32U);
+  CHECK(mip_row_pitch(28U, 5U) == 20U);
+}
+
+TEST_CASE("mip chains handle odd dimensions and 0/15/16 mip boundaries") {
+  CHECK(mip_chain_bytes(71U, 1U, 1U, 0U) == 0U);
+  CHECK(mip_chain_bytes(71U, 1U, 1U, 1U) == 8U);
+  CHECK(mip_chain_bytes(71U, 5U, 3U, 1U) == 16U);
+
+  const uint64_t mips15 = mip_chain_bytes(28U, 3U, 5U, 15U);
+  CHECK(mips15 > 0U);
+
+  auto bc_mips0 = make_dds(4U, 4U, 0U, kDxt1, 0U, 8U);
+  const auto parsed0 = parse_dds(bc_mips0);
+  CHECK(parsed0.ok);
+  CHECK(parsed0.mip_levels == 1U);
+
+  CHECK_FALSE(parse_dds(make_dds(4U, 4U, 16U, kDxt1, 0U, 4096U)).ok);
+}
+
+TEST_CASE("DDS DX10 covers BC2/3/4/5/6H/7 and sRGB formats") {
+  const std::array<uint32_t, 16> kFormats = {74U, 75U, 77U, 78U, 80U, 81U, 83U, 84U,
+                                             95U, 96U, 98U, 99U, 29U, 28U, 91U, 87U};
+  for (const uint32_t fmt : kFormats) {
+    const uint64_t payload = mip_chain_bytes(fmt, 4U, 4U, 1U);
+    const auto dds = parse_dds(make_dds(4U, 4U, 1U, 0U, fmt, payload));
+    CHECK(dds.ok);
+    CHECK(dds.format == fmt);
+  }
+}
+
+TEST_CASE("texture key is deterministic and budget arithmetic rejects overflow") {
+  const std::vector<std::byte> pixels(16, std::byte{0xA5});
+  const TextureDesc desc{
+      .width = 4U, .height = 4U, .mip_levels = 1U, .array_size = 1U, .format = 98U};
+  const uint64_t first = compute_texture_key(desc, pixels);
+  CHECK(first == compute_texture_key(desc, pixels));
+  CHECK(
+      first !=
+      compute_texture_key(
+          TextureDesc{.width = 4U, .height = 4U, .mip_levels = 1U, .array_size = 1U, .format = 99U},
+          pixels));
+
+  TextureSwapPolicy unlimited;
+  CHECK(unlimited.try_reserve(std::numeric_limits<uint64_t>::max()));
+  CHECK_FALSE(unlimited.try_reserve(1U));
+  CHECK(unlimited.stats().over_budget == 1U);
+
+  TextureSwapPolicy limited(std::numeric_limits<uint64_t>::max());
+  CHECK(limited.try_reserve(std::numeric_limits<uint64_t>::max()));
+  CHECK_FALSE(limited.try_reserve(1U));
+  CHECK(limited.stats().over_budget == 1U);
 }
 
 TEST_CASE("parse_dds accepts legacy, RGB32 and DX10 headers") {
