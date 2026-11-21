@@ -107,19 +107,26 @@ jobs:
         run: |
           clang-tidy -p build/host-tests --warnings-as-errors='*' \
             src/core/config.cpp \
+            src/core/config_diagnostics.cpp \
             src/core/module_registry.cpp \
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/render.cpp \
             src/games/ds3/sig_db.cpp \
+            src/gfx/fx/fsr1_math.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
             src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
+            src/tex/texture_pack.cpp \
+            src/timing/fixed_step.cpp \
+            src/timing/frame_pacer.cpp \
             src/timing/frame_stats.cpp \
-            src/timing/gpu_timing.cpp
+            src/timing/gpu_timing.cpp \
+            src/timing/present_policy.cpp
       - name: Run cppcheck strict static analysis
         run: |
           cppcheck \
@@ -136,19 +143,26 @@ jobs:
             --suppress=constParameterPointer \
             --suppress=constParameterReference \
             src/core/config.cpp \
+            src/core/config_diagnostics.cpp \
             src/core/module_registry.cpp \
             src/core/offline_guard.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
+            src/games/ds3/render.cpp \
             src/games/ds3/sig_db.cpp \
+            src/gfx/fx/fsr1_math.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
             src/probe/pe_dump.cpp \
             src/probe/trace_types.cpp \
             src/tex/content_hash.cpp \
+            src/tex/texture_pack.cpp \
+            src/timing/fixed_step.cpp \
+            src/timing/frame_pacer.cpp \
             src/timing/frame_stats.cpp \
-            src/timing/gpu_timing.cpp
+            src/timing/gpu_timing.cpp \
+            src/timing/present_policy.cpp
 
   host-tests:
     if: needs.changes.outputs.heavy == 'true'
