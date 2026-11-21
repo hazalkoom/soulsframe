@@ -110,11 +110,13 @@ jobs:
             src/core/config_diagnostics.cpp \
             src/core/module_registry.cpp \
             src/core/offline_guard.cpp \
+            src/core/runtime_controls.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/games/ds3/render.cpp \
             src/games/ds3/sig_db.cpp \
             src/gfx/fx/fsr1_math.cpp \
+            src/gfx/fx/hud_overlay.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \
@@ -146,11 +148,13 @@ jobs:
             src/core/config_diagnostics.cpp \
             src/core/module_registry.cpp \
             src/core/offline_guard.cpp \
+            src/core/runtime_controls.cpp \
             src/core/sha256.cpp \
             src/games/ds3/profile.cpp \
             src/games/ds3/render.cpp \
             src/games/ds3/sig_db.cpp \
             src/gfx/fx/fsr1_math.cpp \
+            src/gfx/fx/hud_overlay.cpp \
             src/hooks/sigscan.cpp \
             src/probe/gpu_join.cpp \
             src/probe/jsonl_writer.cpp \

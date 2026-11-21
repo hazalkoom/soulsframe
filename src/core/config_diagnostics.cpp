@@ -1,5 +1,7 @@
 #include "core/config_diagnostics.h"
 
+#include "core/runtime_controls.h"
+
 #include <array>
 #include <string_view>
 #include <utility>
@@ -68,7 +70,7 @@ std::vector<ConfigDiagnostic> diagnose_config(const Config& cfg, const Diagnosti
 
   const bool any_present_consumer = cfg.modules.presentation || cfg.modules.particles ||
                                     cfg.modules.upscaler || cfg.modules.fps_unlock ||
-                                    cfg.modules.probe_tracer;
+                                    cfg.modules.probe_tracer || cfg.modules.overlay;
   if (!cfg.modules.frame_telemetry && any_present_consumer) {
     diags.push_back({.severity = DiagnosticSeverity::Info,
                      .code = "SF_CFG_TELEMETRY_OFF_WITH_PRESENT_MODS",
@@ -147,6 +149,43 @@ std::vector<ConfigDiagnostic> diagnose_config(const Config& cfg, const Diagnosti
                                 "\"); use a folder name relative to dinput8.dll."});
   }
 
+  if (cfg.modules.overlay && cfg.hotkeys.enabled) {
+    const std::array<uint32_t, kHotkeyActionCount> vks{{
+        parse_virtual_key(cfg.hotkeys.toggle_overlay),
+        parse_virtual_key(cfg.hotkeys.toggle_mod),
+        parse_virtual_key(cfg.hotkeys.toggle_upscaler),
+        parse_virtual_key(cfg.hotkeys.toggle_particles),
+        parse_virtual_key(cfg.hotkeys.toggle_frame_cap),
+    }};
+    bool dup_found = false;
+    for (size_t i = 0U; i < vks.size() && !dup_found; ++i) {
+      if (vks[i] == 0U) {
+        continue;
+      }
+      for (size_t j = i + 1U; j < vks.size(); ++j) {
+        if (vks[i] == vks[j]) {
+          dup_found = true;
+          break;
+        }
+      }
+    }
+    if (dup_found) {
+      diags.push_back({.severity = DiagnosticSeverity::Warning,
+                       .code = "SF_CFG_HOTKEYS_DUPLICATE",
+                       .message = "Two or more [hotkeys] actions share the same key binding; "
+                                  "both actions will fire on a single key press."});
+    }
+  }
+
+  if (cfg.modules.overlay && !cfg.overlay.show_fps && !cfg.overlay.show_status &&
+      !cfg.hotkeys.enabled) {
+    diags.push_back({.severity = DiagnosticSeverity::Info,
+                     .code = "SF_CFG_OVERLAY_HIDDEN_NO_HOTKEYS",
+                     .message = "modules.overlay is true while show_fps, show_status, and "
+                                "hotkeys.enabled are all false; overlay has no visible UI or "
+                                "input."});
+  }
+
   return diags;
 }
 
@@ -155,7 +194,7 @@ std::string format_config_summary(const Config& cfg) {
     std::string_view name;
     bool enabled;
   };
-  const std::array<ModFlag, 7> flags{{
+  const std::array<ModFlag, 8> flags{{
       {.name = "frame_telemetry", .enabled = cfg.modules.frame_telemetry},
       {.name = "presentation", .enabled = cfg.modules.presentation},
       {.name = "probe_tracer", .enabled = cfg.modules.probe_tracer},
@@ -163,6 +202,7 @@ std::string format_config_summary(const Config& cfg) {
       {.name = "upscaler", .enabled = cfg.modules.upscaler},
       {.name = "fps_unlock", .enabled = cfg.modules.fps_unlock},
       {.name = "textures", .enabled = cfg.modules.textures},
+      {.name = "overlay", .enabled = cfg.modules.overlay},
   }};
 
   std::string mods;

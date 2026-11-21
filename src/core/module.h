@@ -23,6 +23,18 @@ struct PresentCtx {
 
   /// `Present` flags bitmask (e.g. `DXGI_PRESENT_ALLOW_TEARING`); modules may adjust it.
   uint32_t present_flags = 0;
+
+  /// Rolling average frame rate computed by swap-chain telemetry.
+  double avg_fps = 0.0;
+
+  /// Rolling average frame time in milliseconds.
+  double avg_frame_ms = 0.0;
+
+  /// Rolling 1% low (99th percentile worst) frame time in milliseconds.
+  double p1_low_ms = 0.0;
+
+  /// Count of >2x median frame-time spikes in the rolling window.
+  uint32_t spike_count = 0;
 };
 
 /// Lifecycle interface implemented by every SoulsFrame subsystem (telemetry, pacing, FSR, etc.).

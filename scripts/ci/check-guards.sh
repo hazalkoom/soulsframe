@@ -27,6 +27,8 @@ pure_files=(
   src/core/module_registry.cpp
   src/core/offline_guard.h
   src/core/offline_guard.cpp
+  src/core/runtime_controls.h
+  src/core/runtime_controls.cpp
   src/core/sha256.h
   src/core/sha256.cpp
   src/core/version.h
@@ -38,6 +40,8 @@ pure_files=(
   src/games/ds3/sig_db.cpp
   src/gfx/fx/fsr1_math.h
   src/gfx/fx/fsr1_math.cpp
+  src/gfx/fx/hud_overlay.h
+  src/gfx/fx/hud_overlay.cpp
   src/hooks/sigscan.h
   src/hooks/sigscan.cpp
   src/probe/gpu_join.h

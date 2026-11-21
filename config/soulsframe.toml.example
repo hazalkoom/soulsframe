@@ -21,6 +21,7 @@ particles = false
 upscaler = false
 fps_unlock = false
 textures = false
+overlay = false
 
 [particles]
 # M6 particle overdraw mitigation: "auto", "throttle", or "half_res"
@@ -50,6 +51,24 @@ pack_dir = "soulsframe_textures"
 max_pack_mb = 512
 # Log keys of loaded textures so packs can be authored with tools/py/bake_textures.py
 dump_keys = false
+
+[overlay]
+# In-game FPS viewer & hotkey status HUD (requires modules.overlay = true)
+show_fps = true
+show_status = true
+# Corner: "top_left", "top_right", "bottom_left", or "bottom_right"
+position = "top_left"
+scale = 2
+opacity_percent = 75
+
+[hotkeys]
+# Live toggles (F1-F12, Insert, Delete, Home, End, PageUp, PageDown, Pause, ScrollLock, Numpad0-9, or "none")
+enabled = true
+toggle_overlay = "F9"
+toggle_mod = "F10"
+toggle_upscaler = "F11"
+toggle_particles = "F8"
+toggle_frame_cap = "F12"
 
 [probe]
 # Only used in SF_PROBE builds when modules.probe_tracer = true.

@@ -43,6 +43,7 @@ struct Config {
     bool upscaler = false;
     bool fps_unlock = false;
     bool textures = false;
+    bool overlay = false;
   } modules;
 
   /// Milestone 6 particle pass mitigation and overdraw budget settings.
@@ -105,6 +106,45 @@ struct Config {
     /// Log keys of eligible textures (first 4096 unique) so packs can be authored offline.
     bool dump_keys = false;
   } textures;
+
+  /// In-game D3D11 FPS viewer & module status HUD (`[modules] overlay`).
+  struct Overlay {
+    /// Display live FPS, average frame time, and 1% low line in the HUD.
+    bool show_fps = true;
+
+    /// Display active feature badges and configured hotkey hints in the HUD.
+    bool show_status = true;
+
+    /// Screen anchor corner: "top_left", "top_right", "bottom_left", or "bottom_right".
+    std::string position = "top_left";
+
+    /// Integer pixel scaling factor for the 8x8 bitmap HUD (clamped to [1, 4]).
+    uint32_t scale = 2;
+
+    /// Panel background opacity percentage (clamped to [0, 100]).
+    uint32_t opacity_percent = 75;
+  } overlay;
+
+  /// Live in-game keyboard hotkeys (`[modules] overlay` must be enabled).
+  struct Hotkeys {
+    /// Master switch allowing in-game hotkey polling without restarting the game.
+    bool enabled = true;
+
+    /// Show or hide the on-screen FPS/status HUD (default "F9").
+    std::string toggle_overlay = "F9";
+
+    /// Bypass or resume active performance features without unloading the DLL (default "F10").
+    std::string toggle_mod = "F10";
+
+    /// Toggle FSR 1 / RCAS upscaling live during gameplay (default "F11").
+    std::string toggle_upscaler = "F11";
+
+    /// Toggle M6 particle overdraw mitigation live during gameplay (default "F8").
+    std::string toggle_particles = "F8";
+
+    /// Toggle M5 frame-rate cap (`present.max_fps`) live during gameplay (default "F12").
+    std::string toggle_frame_cap = "F12";
+  } hotkeys;
 
   /// Settings for `SF_PROBE` draw-call and pass JSONL capture builds.
   struct Probe {

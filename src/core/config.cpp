@@ -1,5 +1,7 @@
 #include "core/config.h"
 
+#include "core/runtime_controls.h"
+
 #include <algorithm>
 #include <array>
 #include <fstream>
@@ -71,6 +73,20 @@ void read_safe_filename(const toml::table& tbl, std::string_view key, std::strin
   }
 }
 
+void read_hotkey_key(const toml::table& tbl, std::string_view key, std::string_view full_name,
+                     std::string& target, std::vector<std::string>& warnings) {
+  if (auto v = tbl[key].value<std::string>()) {
+    if (is_valid_hotkey_name(*v)) {
+      target = *v;
+    } else {
+      warnings.emplace_back(std::string(full_name) + " invalid hotkey ('" + *v + "'); using '" +
+                            target + "'");
+    }
+  } else if (tbl.contains(key)) {
+    warnings.emplace_back(std::string(full_name) + " must be string; using default");
+  }
+}
+
 } // namespace
 
 ConfigParseResult parse_config_toml(std::string_view toml_text) {
@@ -103,8 +119,9 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     return out;
   }
 
-  constexpr std::array<std::string_view, 8> kRootKeys = {
-      "general", "present", "modules", "probe", "particles", "upscaler", "fps_unlock", "textures"};
+  constexpr std::array<std::string_view, 10> kRootKeys = {
+      "general",  "present",    "modules",  "probe",   "particles",
+      "upscaler", "fps_unlock", "textures", "overlay", "hotkeys"};
   warn_unknown_keys(root, "", kRootKeys, out.warnings);
 
   if (auto* gen = root["general"].as_table()) {
@@ -147,9 +164,9 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
   }
 
   if (auto* mods = root["modules"].as_table()) {
-    constexpr std::array<std::string_view, 7> kModKeys = {
+    constexpr std::array<std::string_view, 8> kModKeys = {
         "frame_telemetry", "presentation", "probe_tracer", "particles",
-        "upscaler",        "fps_unlock",   "textures"};
+        "upscaler",        "fps_unlock",   "textures",     "overlay"};
     warn_unknown_keys(*mods, "modules.", kModKeys, out.warnings);
 
     read_bool_key(*mods, "frame_telemetry", "modules.frame_telemetry",
@@ -164,6 +181,7 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
     read_bool_key(*mods, "fps_unlock", "modules.fps_unlock", out.config.modules.fps_unlock,
                   out.warnings);
     read_bool_key(*mods, "textures", "modules.textures", out.config.modules.textures, out.warnings);
+    read_bool_key(*mods, "overlay", "modules.overlay", out.config.modules.overlay, out.warnings);
   }
 
   if (auto* part = root["particles"].as_table()) {
@@ -253,6 +271,47 @@ ConfigParseResult parse_config_toml(std::string_view toml_text) {
                      out.config.textures.max_pack_mb, out.warnings);
     read_bool_key(*tx, "dump_keys", "textures.dump_keys", out.config.textures.dump_keys,
                   out.warnings);
+  }
+
+  if (auto* ov = root["overlay"].as_table()) {
+    constexpr std::array<std::string_view, 5> kOverlayKeys = {"show_fps", "show_status", "position",
+                                                              "scale", "opacity_percent"};
+    warn_unknown_keys(*ov, "overlay.", kOverlayKeys, out.warnings);
+    read_bool_key(*ov, "show_fps", "overlay.show_fps", out.config.overlay.show_fps, out.warnings);
+    read_bool_key(*ov, "show_status", "overlay.show_status", out.config.overlay.show_status,
+                  out.warnings);
+
+    if (auto v = (*ov)["position"].value<std::string>()) {
+      if (*v == "top_left" || *v == "top_right" || *v == "bottom_left" || *v == "bottom_right") {
+        out.config.overlay.position = *v;
+      } else {
+        out.warnings.emplace_back("overlay.position invalid ('" + *v + "'); using 'top_left'");
+      }
+    } else if (ov->contains("position")) {
+      out.warnings.emplace_back("overlay.position must be string; using default");
+    }
+
+    read_clamped_u32(*ov, "scale", "overlay.scale", 1U, 4U, out.config.overlay.scale, out.warnings);
+    read_clamped_u32(*ov, "opacity_percent", "overlay.opacity_percent", 0U, 100U,
+                     out.config.overlay.opacity_percent, out.warnings);
+  }
+
+  if (auto* hk = root["hotkeys"].as_table()) {
+    constexpr std::array<std::string_view, 6> kHotkeyKeys = {
+        "enabled",         "toggle_overlay",   "toggle_mod",
+        "toggle_upscaler", "toggle_particles", "toggle_frame_cap"};
+    warn_unknown_keys(*hk, "hotkeys.", kHotkeyKeys, out.warnings);
+    read_bool_key(*hk, "enabled", "hotkeys.enabled", out.config.hotkeys.enabled, out.warnings);
+    read_hotkey_key(*hk, "toggle_overlay", "hotkeys.toggle_overlay",
+                    out.config.hotkeys.toggle_overlay, out.warnings);
+    read_hotkey_key(*hk, "toggle_mod", "hotkeys.toggle_mod", out.config.hotkeys.toggle_mod,
+                    out.warnings);
+    read_hotkey_key(*hk, "toggle_upscaler", "hotkeys.toggle_upscaler",
+                    out.config.hotkeys.toggle_upscaler, out.warnings);
+    read_hotkey_key(*hk, "toggle_particles", "hotkeys.toggle_particles",
+                    out.config.hotkeys.toggle_particles, out.warnings);
+    read_hotkey_key(*hk, "toggle_frame_cap", "hotkeys.toggle_frame_cap",
+                    out.config.hotkeys.toggle_frame_cap, out.warnings);
   }
 
   if (auto* prb = root["probe"].as_table()) {

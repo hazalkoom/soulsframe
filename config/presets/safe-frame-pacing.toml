@@ -20,3 +20,19 @@ particles = false
 upscaler = false
 fps_unlock = false
 textures = false
+overlay = true
+
+[overlay]
+show_fps = true
+show_status = true
+position = "top_left"
+scale = 2
+opacity_percent = 75
+
+[hotkeys]
+enabled = true
+toggle_overlay = "F9"
+toggle_mod = "F10"
+toggle_upscaler = "F11"
+toggle_particles = "F8"
+toggle_frame_cap = "F12"
