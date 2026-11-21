@@ -1,6 +1,7 @@
 # Step 16 — M9 texture-pack swap & offline bake
 
 ## What was built
+
 - **Pure core `src/tex/texture_pack.{h,cpp}`** (Linux-tested, guard-listed): DXGI format
   size helpers, `compute_texture_key()` (XXH64 of top mip seeded by width/height/format),
   hardened `parse_dds()` (DXT1/3/5, ATI1/2, RGBA32, DX10; rejects cubes, arrays, truncation,
@@ -18,13 +19,16 @@
   (Python instead of the originally planned C# — no extra toolchain needed.)
 
 ## Why
+
 Lets modders ship lower-VRAM (BC7/BC1) or higher-quality textures without touching game
 archives; content keys make packs independent of file paths in the game data.
 
 ## Verification
+
 - `check-guards.sh` pass; host tests 2/2 (7 new texture-pack test cases).
 - MinGW win64 release build; imports checked.
 
 ## Follow-ups
+
 - libFuzzer target for `parse_dds`/`parse_manifest`.
 - Wine smoke scenario with a testbed texture + pack.

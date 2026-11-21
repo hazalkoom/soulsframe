@@ -100,12 +100,12 @@ Effort figures assume part-time solo work. Treat them as rough.
 | **M2** | Probe v1 (**Done**) | Draw-call tracer with call-site aggregation; pass boundary detection; resource list; JSONL export; Python analysis script | 1-2 weeks |
 | **M3** | GPU pass timing + benchmark harness | Per-pass GPU ms; repeatable benchmark routes; baseline report committed | 1 week |
 | **M4** | RE foundation | Clean memory dump of the unpacked exe in Ghidra; time-API tracer finds frame limiter and dt sources; signature DB with SHA-256 key | 1-3 weeks |
-| **M5** | Presentation fixes | Flip-model/pacing experiment with measured result (keep or drop) | 1 week |
-| **M6** | Particle mitigation | Low-res particle pass or shader/data diet with measured GPU gain in worst scenes | 2-4 weeks |
-| **M7** | Render scale + FSR 1 | Internal scale 0.5-1.0 works without broken effects; RCAS sharpen; toggle at runtime | 3-5 weeks |
-| **M8** | FPS unlock experiments | Experiment log of what breaks at 90/120 Hz; decision: fixed-step + interpolation, or ship without | open-ended |
-| **M9** | Texture swap/bake | C# bake tool + runtime hash swap; optional HD packs | 2 weeks |
-| **M10** | Polish/release | Config UX, warnings, docs, Windows-native validation | 1-2 weeks |
+| **M5** | Presentation fixes (**Implemented**) | Pure flip upgrade/present policy, frame pacer, and D3D11 presentation module are covered by Linux tests and config kill switches | Done |
+| **M6** | Particle mitigation (**Implemented**) | Pure particle heuristics and D3D11 module implement throttle/low-res recipe controls with independent kill switches | Done |
+| **M7** | Render scale + FSR 1 (**Implemented**) | Pure FSR 1 EASU/RCAS math plus D3D11 upscaler module, presets, and quality/scale controls | Done |
+| **M8** | FPS unlock experiments (**Implemented**) | Fixed-step accumulator, safety verdict, experiment log, and dry-run-first configuration | Done |
+| **M9** | Texture swap/bake (**Implemented**) | Pure DDS/manifest/key/budget core, D3D11 texture module, Python bake tool, and hash-key packs | Done |
+| **M10** | Polish/release (**Implemented, v0.10.0-rc**) | Config diagnostics, presets, `sftool config-check/version`, log filtering, cleanup, Windows validation guide, release hardening | Done |
 
 Order matters: M2-M4 are what turn guessing into engineering. Skip them and every later milestone costs more.
 

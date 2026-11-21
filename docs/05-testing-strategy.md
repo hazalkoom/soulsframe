@@ -37,13 +37,21 @@ Rule: a bug found at L6 gets a regression test at the lowest layer that can repr
 | `offline_guard` | Refuses to enable when online markers are present; requires explicit opt-in |
 | `pass_detector` | Given recorded `DrawState` sequences (from `bench/` captures), classifies particle passes correctly |
 
-- **Coverage:** gcov/lcov or `llvm-cov` on the host build. Target 80% on pure modules, no target for hook glue. Upload to Codecov (free for public repos) from the nightly job; do not fail PRs on coverage drops at first.
+### M5-M10 pure-module testing
+
+- Presentation and frame pacing: test flip upgrade eligibility, present test/tearing flags, frame-pacer target periods, and fixed-step accumulators in `tests/unit/test_present_policy.cpp`, `tests/unit/test_frame_pacer.cpp`, and `tests/unit/test_fixed_step.cpp`.
+- Particles and FSR 1: test render-pass budgets/particle heuristics and EASU constants in `tests/unit/test_particles.cpp` and `tests/unit/test_fsr1_math.cpp`.
+- Texture packs: test legacy DXT1/3/5, ATI1/2, BC4/BC5, DX10 BC2/3/4/5/6H/7, sRGB, odd dimensions, mip boundaries, manifest safety, key determinism, and VRAM budget overflow in `tests/unit/test_texture_pack.cpp`.
+- Diagnostics: test every `SF_CFG_*` code, severity, preset mismatch, probe/release mismatch, FPS cap conflict, and texture path warning in `tests/unit/test_config_diagnostics.cpp`.
+- Coverage gate: `SF_MIN_LINE_COVERAGE=90 bash scripts/ci/run-coverage.sh` is the PR gate for pure modules. The suite currently reports 95%+ line coverage.
+
+- **Coverage:** gcov/lcov or `llvm-cov` on the host build. Target 90% on pure modules; hook glue remains measured in Wine/Windows validation.
 - **Sanitizers:** a second host preset `host-asan` with `-fsanitize=address,undefined`. Run the same unit tests under it in CI.
 
 ## 3. L2 fuzzing
 
-- [libFuzzer](https://llvm.org/docs/LibFuzzer.html) via clang on the host, targets under `tests/fuzz/`: `fuzz_dds`, `fuzz_config`, `fuzz_sigpattern`, `fuzz_inspector_msg`.
-- Commit a small seed corpus under `tests/fuzz/corpus/`. Run 60 s per target on PRs, 10 min per target nightly. Crashes upload as artifacts.
+- [libFuzzer](https://llvm.org/docs/LibFuzzer.html) via clang on the host. Texture-pack targets are `fuzz_texture_dds` and `fuzz_texture_manifest`, alongside config/signature/JSONL fuzzers under `tests/fuzz/`.
+- Commit valid and malformed seed corpora under `tests/fuzz/corpus/dds/` and `tests/fuzz/corpus/manifest/`. CI runs each fuzz target for 10 seconds; longer nightly runs remain optional. Crashes upload as artifacts.
 - Later option: [OSS-Fuzz](https://github.com/google/oss-fuzz) integration if the project gets traction (free for open source).
 
 ## 4. L3 shader tests

@@ -79,6 +79,36 @@ trace_resources = true
 # Measure per-pass and per-frame GPU time via D3D11 timestamp queries (M3). Kill switch: set false
 # if a driver misbehaves with queries; capture then omits `gpu_ms` fields.
 gpu_timing = true
+
+[particles]
+mode = "off"          # off, throttle, or low_res
+max_instances_per_draw = 0
+max_draws_per_frame = 0
+
+[upscaler]
+mode = "none"         # none, easu, easu_rcas
+preset = "custom"     # native, ultra_quality, quality, balanced, performance
+scale_percent = 100
+sharpness_percent = 50
+
+[fps_unlock]
+strategy = "fixed_step" # fixed_step, camera_only, variable_dt
+target_fps = 60
+sim_tick_hz = 60
+max_substeps = 8
+
+[textures]
+pack_dir = "soulsframe_textures"
+max_pack_mb = 16
+dump_keys = false
+```
+
+Use `config/presets/safe-frame-pacing.toml`, `low-end-gpu.toml`, or `probe-capture.toml` as starting points. Validate the effective config with:
+
+```bash
+./build/win64-release/sftool config-check soulsframe.toml
+python3 tools/py/bake_textures.py build soulsframe_textures
+python3 tools/py/bake_textures.py --self-test
 ```
 
 Safety-critical defaults:
