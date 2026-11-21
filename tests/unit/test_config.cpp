@@ -385,3 +385,62 @@ TEST_CASE("config validates [fps_unlock] strategies and bounds") {
   CHECK(bad.config.fps_unlock.strategy == "fixed_step");
   CHECK(bad.warnings.size() == 2);
 }
+
+TEST_CASE("config validates [overlay] and [hotkeys] settings and bounds") {
+  const auto def = sf::Config::defaults();
+  CHECK_FALSE(def.modules.overlay);
+  CHECK(def.overlay.show_fps);
+  CHECK(def.overlay.show_status);
+  CHECK(def.overlay.position == "top_left");
+  CHECK(def.overlay.scale == 2U);
+  CHECK(def.overlay.opacity_percent == 75U);
+  CHECK(def.hotkeys.enabled);
+  CHECK(def.hotkeys.toggle_overlay == "F9");
+  CHECK(def.hotkeys.toggle_mod == "F10");
+
+  const auto valid = sf::parse_config_toml(R"(
+    [modules]
+    overlay = true
+
+    [overlay]
+    show_fps = true
+    show_status = false
+    position = "bottom_right"
+    scale = 3
+    opacity_percent = 50
+
+    [hotkeys]
+    enabled = true
+    toggle_overlay = "Insert"
+    toggle_mod = "End"
+    toggle_upscaler = "Numpad1"
+    toggle_particles = "none"
+    toggle_frame_cap = "PageDown"
+  )");
+  CHECK(valid.parsed_ok);
+  CHECK(valid.warnings.empty());
+  CHECK(valid.config.modules.overlay);
+  CHECK_FALSE(valid.config.overlay.show_status);
+  CHECK(valid.config.overlay.position == "bottom_right");
+  CHECK(valid.config.overlay.scale == 3U);
+  CHECK(valid.config.overlay.opacity_percent == 50U);
+  CHECK(valid.config.hotkeys.toggle_overlay == "Insert");
+  CHECK(valid.config.hotkeys.toggle_particles == "none");
+
+  const auto bad = sf::parse_config_toml(R"(
+    [overlay]
+    position = "center"
+    scale = 99
+    opacity_percent = 999
+
+    [hotkeys]
+    toggle_mod = "NotAValidKey"
+    extra_hotkey = "F1"
+  )");
+  CHECK(bad.parsed_ok);
+  CHECK(bad.config.overlay.position == "top_left");
+  CHECK(bad.config.overlay.scale == 4U);
+  CHECK(bad.config.overlay.opacity_percent == 100U);
+  CHECK(bad.config.hotkeys.toggle_mod == "F10");
+  CHECK(bad.warnings.size() == 5U);
+}

@@ -167,6 +167,22 @@ TEST_CASE("diagnose_config covers every diagnostic code and preset branch") {
   const auto unknown = sf::diagnose_config(cfg);
   CHECK_FALSE(
       has_code(unknown, "SF_CFG_UPSCALER_PRESET_OVERRIDES_SCALE", sf::DiagnosticSeverity::Info));
+
+  // Duplicate hotkey bindings and hidden overlay with hotkeys disabled.
+  {
+    sf::Config ov_cfg = sf::Config::defaults();
+    ov_cfg.general.offline_acknowledged = true;
+    ov_cfg.modules.overlay = true;
+    ov_cfg.hotkeys.toggle_upscaler = "F9";
+    const auto dup = sf::diagnose_config(ov_cfg);
+    CHECK(has_code(dup, "SF_CFG_HOTKEYS_DUPLICATE", sf::DiagnosticSeverity::Warning));
+
+    ov_cfg.overlay.show_fps = false;
+    ov_cfg.overlay.show_status = false;
+    ov_cfg.hotkeys.enabled = false;
+    const auto hidden = sf::diagnose_config(ov_cfg);
+    CHECK(has_code(hidden, "SF_CFG_OVERLAY_HIDDEN_NO_HOTKEYS", sf::DiagnosticSeverity::Info));
+  }
 }
 
 TEST_CASE("bundled config template and presets stay safe and parse without warnings") {

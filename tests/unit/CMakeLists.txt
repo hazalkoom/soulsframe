@@ -8,6 +8,7 @@ add_executable(soulsframe_unit_tests
   test_fsr1_math.cpp
   test_gpu_join.cpp
   test_gpu_timing.cpp
+  test_hud_overlay.cpp
   test_jsonl_writer.cpp
   test_module_registry.cpp
   test_offline_guard.cpp
@@ -17,6 +18,7 @@ add_executable(soulsframe_unit_tests
   test_present_policy.cpp
   test_probe_trace.cpp
   test_profile.cpp
+  test_runtime_controls.cpp
   test_security_inputs.cpp
   test_sha256.cpp
   test_sig_db.cpp

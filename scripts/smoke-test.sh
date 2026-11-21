@@ -257,6 +257,46 @@ if grep -q "\[INFO\] Present hook installed" soulsframe.log; then
 fi
 cp soulsframe.log soulsframe-diagnostics.log
 
+# Scenario 3h (M11): In-game FPS viewer & hotkey HUD drawn over FSR 1 upscaler + resize.
+cat > soulsframe.toml <<'EOF'
+[general]
+offline_acknowledged = true
+mod_enabled = true
+log_level = "info"
+
+[modules]
+frame_telemetry = true
+upscaler = true
+overlay = true
+
+[upscaler]
+mode = "fsr1"
+preset = "ultra_quality"
+sharpness_percent = 80
+
+[overlay]
+show_fps = true
+show_status = true
+position = "top_left"
+scale = 2
+opacity_percent = 75
+
+[hotkeys]
+enabled = true
+toggle_overlay = "F9"
+toggle_mod = "F10"
+toggle_upscaler = "F11"
+toggle_particles = "F8"
+toggle_frame_cap = "F12"
+EOF
+
+rm -f soulsframe.log
+timeout 60 xvfb-run -a wine d3d11_testbed.exe --frames 20 --resize
+grep -q "OverlayModule active (position=top_left, scale=2, hotkeys=on)" soulsframe.log
+grep -q "UpscalerModule shutdown (frames=20, easu_passes=20, rcas_passes=20, resizes=1)" soulsframe.log
+grep -q "OverlayModule shutdown (frames=20, hud_draws=20, hotkey_events=0, resizes=1)" soulsframe.log
+cp soulsframe.log soulsframe-overlay.log
+
 SCENARIO_4_OK=false
 if [ -n "$PROBE_DIR" ] && [ -f "$PROBE_DIR/dinput8.dll" ]; then
   # Scenario 4: SF_PROBE draw-call tracer JSONL capture with alpha-blended particles.
@@ -313,6 +353,7 @@ cat > smoke-result.json <<EOF
   "scenario_3e_fps_unlock_dry_run_ok": true,
   "scenario_3f_textures_swap_ok": true,
   "scenario_3g_config_diagnostics_ok": true,
+  "scenario_3h_overlay_hud_hotkeys_ok": true,
   "scenario_4_probe_jsonl_capture_ok": ${SCENARIO_4_OK},
   "present_hook_installed": true,
   "resize_buffers_hooked": true,
