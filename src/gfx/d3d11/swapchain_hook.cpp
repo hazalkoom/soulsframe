@@ -31,6 +31,7 @@ ModuleRegistry* g_registry = nullptr;
 std::mutex g_stats_mu;
 WinClock g_clock;
 timing::FrameStats g_stats(120);
+timing::FrameMetrics g_cached_metrics{};
 std::atomic<uint64_t> g_frame_index{0};
 bool g_hooks_installed = false;
 bool g_owns_mh_init = false;
@@ -41,23 +42,34 @@ bool g_log_telemetry = true;
 HRESULT STDMETHODCALLTYPE hooked_present(IDXGISwapChain* sc, UINT sync_interval, UINT flags) {
   double dt_ms = 0.0;
   uint64_t frame = 0;
+  timing::FrameMetrics metrics{};
 
   {
     std::lock_guard lk(g_stats_mu);
     dt_ms = g_stats.tick(g_clock);
     frame = ++g_frame_index;
+    if (g_stats.count() > 0 && (frame <= 15U || frame % 15U == 0U)) {
+      g_cached_metrics = g_stats.compute_metrics();
+    }
+    metrics = g_cached_metrics;
     if (g_log_telemetry && frame % 120 == 0 && g_stats.count() > 0) {
-      const auto m = g_stats.compute_metrics();
-      SF_LOG("avg frame time %.3f ms (%.1f fps) | p1_low %.3f ms | spikes %u", m.avg_ms, m.avg_fps,
-             m.p1_low_ms, m.spike_count);
+      SF_LOG("avg frame time %.3f ms (%.1f fps) | p1_low %.3f ms | spikes %u", metrics.avg_ms,
+             metrics.avg_fps, metrics.p1_low_ms, metrics.spike_count);
     }
   }
 
   UINT effective_sync = sync_interval;
   UINT effective_flags = flags;
   if (g_registry) {
-    PresentCtx ctx{frame, dt_ms, sc, static_cast<uint32_t>(sync_interval),
-                   static_cast<uint32_t>(flags)};
+    PresentCtx ctx{frame,
+                   dt_ms,
+                   sc,
+                   static_cast<uint32_t>(sync_interval),
+                   static_cast<uint32_t>(flags),
+                   metrics.avg_fps,
+                   metrics.avg_ms,
+                   metrics.p1_low_ms,
+                   metrics.spike_count};
     g_registry->on_present(ctx);
     effective_sync = static_cast<UINT>(ctx.sync_interval);
     effective_flags = static_cast<UINT>(ctx.present_flags);

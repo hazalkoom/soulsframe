@@ -1,6 +1,7 @@
 #include "timing/fps_unlock_module.h"
 
 #include "core/log.h"
+#include "core/runtime_controls.h"
 
 namespace sf::timing {
 
@@ -34,7 +35,7 @@ bool FpsUnlockModule::init(const sf::GameProfile& profile, const sf::Config& cfg
 }
 
 void FpsUnlockModule::on_present(sf::PresentCtx& ctx) {
-  if (!impl_->active) {
+  if (!impl_->active || !sf::runtime_controls().should_run_fps_unlock()) {
     return;
   }
   impl_->stepper.advance(ctx.delta_ms);

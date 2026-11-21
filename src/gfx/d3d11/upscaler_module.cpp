@@ -1,6 +1,7 @@
 #include "gfx/d3d11/upscaler_module.h"
 
 #include "core/log.h"
+#include "core/runtime_controls.h"
 #include "gfx/fx/fsr1_math.h"
 
 #include <d3d11.h>
@@ -167,11 +168,11 @@ struct UpscalerModule::Impl {
                                      nullptr, nullptr, "main", "vs_4_0", 0, 0, &vs_blob, nullptr);
     const HRESULT ps_hr = compile_fn(kFsr1RcasPsHlsl, std::strlen(kFsr1RcasPsHlsl), nullptr,
                                      nullptr, nullptr, "main", "ps_4_0", 0, 0, &ps_blob, nullptr);
-    FreeLibrary(compiler);
 
     if (FAILED(vs_hr) || FAILED(ps_hr) || vs_blob == nullptr || ps_blob == nullptr) {
       safe_release(vs_blob);
       safe_release(ps_blob);
+      FreeLibrary(compiler);
       SF_LOG("UpscalerModule: HLSL compilation failed (vs=0x%08lx, ps=0x%08lx)",
              static_cast<unsigned long>(vs_hr), static_cast<unsigned long>(ps_hr));
       pipeline_failed = true;
@@ -182,6 +183,8 @@ struct UpscalerModule::Impl {
     dev->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &ps);
     safe_release(vs_blob);
     safe_release(ps_blob);
+    // Keep compiler loaded until both ID3DBlob COM objects are fully released.
+    FreeLibrary(compiler);
 
     D3D11_SAMPLER_DESC sdesc{};
     sdesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -264,7 +267,8 @@ bool UpscalerModule::init(const sf::GameProfile&, const sf::Config& cfg) {
 }
 
 void UpscalerModule::on_present(sf::PresentCtx& ctx) {
-  if (!impl_->active || impl_->cfg.mode == "none" || ctx.swap_chain == nullptr) {
+  if (!impl_->active || !sf::runtime_controls().should_run_upscaler() ||
+      impl_->cfg.mode == "none" || ctx.swap_chain == nullptr) {
     return;
   }
 

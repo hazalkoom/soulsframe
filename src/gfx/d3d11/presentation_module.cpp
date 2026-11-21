@@ -1,6 +1,7 @@
 #include "gfx/d3d11/presentation_module.h"
 
 #include "core/log.h"
+#include "core/runtime_controls.h"
 #include "timing/present_policy.h"
 
 #include <MinHook.h>
@@ -297,7 +298,7 @@ void PresentationModule::on_present(sf::PresentCtx& ctx) {
     return;
   }
 
-  if (impl_->pacer.enabled()) {
+  if (impl_->pacer.enabled() && sf::runtime_controls().should_run_frame_cap()) {
     impl_->pacer.pace(impl_->clock);
   }
 

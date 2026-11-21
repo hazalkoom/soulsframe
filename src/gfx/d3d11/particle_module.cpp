@@ -1,6 +1,7 @@
 #include "gfx/d3d11/particle_module.h"
 
 #include "core/log.h"
+#include "core/runtime_controls.h"
 #include "games/ds3/render.h"
 
 #include <MinHook.h>
@@ -313,7 +314,8 @@ DrawFilterDecision filter_d3d11_draw(void* device_context, uint32_t vertex_or_in
       is_instanced ? std::max<uint32_t>(1U, instance_count) : instance_count;
   t_saved_vp_count = 0;
 
-  if (!g_active.load(std::memory_order_relaxed) || device_context == nullptr) {
+  if (!g_active.load(std::memory_order_relaxed) || !sf::runtime_controls().should_run_particles() ||
+      device_context == nullptr) {
     return out;
   }
 

@@ -5,9 +5,11 @@
 #include "core/log.h"
 #include "core/module_registry.h"
 #include "core/offline_guard.h"
+#include "core/runtime_controls.h"
 #include "core/version.h"
 #include "core/win_helpers.h"
 #include "games/ds3/profile.h"
+#include "gfx/d3d11/overlay_module.h"
 #include "gfx/d3d11/particle_module.h"
 #include "gfx/d3d11/presentation_module.h"
 #include "gfx/d3d11/swapchain_hook.h"
@@ -31,7 +33,8 @@ public:
   const char* name() const override { return "frame_telemetry"; }
   bool is_enabled(const sf::Config& cfg) const override {
     return cfg.modules.frame_telemetry || cfg.modules.presentation || cfg.modules.particles ||
-           cfg.modules.upscaler || cfg.modules.fps_unlock || cfg.modules.probe_tracer;
+           cfg.modules.upscaler || cfg.modules.fps_unlock || cfg.modules.probe_tracer ||
+           cfg.modules.overlay;
   }
   bool init(const sf::GameProfile&, const sf::Config& cfg) override {
     return sf::gfx::install_swapchain_hooks(&g_registry, cfg.modules.frame_telemetry);
@@ -104,12 +107,15 @@ DWORD WINAPI init_thread(LPVOID) {
     }
   }
 
+  sf::runtime_controls().reset_from_config(cfg);
+
   g_registry.register_module(std::make_unique<FrameTelemetryModule>());
   g_registry.register_module(std::make_unique<sf::gfx::PresentationModule>());
   g_registry.register_module(std::make_unique<sf::gfx::ParticleModule>());
   g_registry.register_module(std::make_unique<sf::gfx::UpscalerModule>());
   g_registry.register_module(std::make_unique<sf::timing::FpsUnlockModule>());
   g_registry.register_module(std::make_unique<sf::gfx::TextureModule>(sf::log::module_dir(g_self)));
+  g_registry.register_module(std::make_unique<sf::gfx::OverlayModule>());
 #ifdef SF_PROBE
   g_registry.register_module(
       std::make_unique<sf::probe::ProbeModule>(sf::log::module_dir(g_self), exe_sha));
