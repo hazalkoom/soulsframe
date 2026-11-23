@@ -37,7 +37,9 @@ public:
   ~ParticleModule() override;
 
   const char* name() const override { return "particles"; }
-  bool is_enabled(const sf::Config& cfg) const override { return cfg.modules.particles; }
+  bool is_enabled(const sf::Config& cfg) const override {
+    return cfg.modules.particles || (cfg.modules.overlay && cfg.hotkeys.enabled);
+  }
   bool init(const sf::GameProfile& profile, const sf::Config& cfg) override;
   void on_present(sf::PresentCtx& ctx) override;
   void shutdown() override;

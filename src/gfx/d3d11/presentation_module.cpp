@@ -249,6 +249,14 @@ void remove_factory_hook() {
 
 } // namespace
 
+bool is_flip_model_active() noexcept {
+  return g_flip_active.load(std::memory_order_relaxed);
+}
+
+bool is_tearing_flag_active() noexcept {
+  return g_tearing_enabled.load(std::memory_order_relaxed);
+}
+
 struct PresentationModule::Impl {
   WinPacerClock clock;
   sf::timing::FramePacer pacer;
@@ -273,14 +281,17 @@ bool PresentationModule::init(const sf::GameProfile&, const sf::Config& cfg) {
   g_upgrade_succeeded.store(0, std::memory_order_relaxed);
   g_upgrade_fallbacks.store(0, std::memory_order_relaxed);
 
-  impl_->pacer.set_target_fps(cfg.present.max_fps);
+  const bool pacer_wanted = (cfg.modules.presentation && cfg.present.max_fps > 0U) ||
+                            (cfg.modules.overlay && cfg.hotkeys.enabled);
+  const uint32_t eff_max_fps = (cfg.present.max_fps > 0U) ? cfg.present.max_fps : 60U;
+  impl_->pacer.set_target_fps(pacer_wanted ? eff_max_fps : 0U);
   if (impl_->pacer.enabled()) {
     if (timeBeginPeriod(1) == TIMERR_NOERROR) {
       impl_->timer_period_active = true;
     }
   }
 
-  if (cfg.present.mode == "flip") {
+  if (cfg.modules.presentation && cfg.present.mode == "flip") {
     impl_->flip_hook_active = install_factory_hook();
     if (!impl_->flip_hook_active) {
       SF_LOG("PresentationModule: continuing without CreateSwapChain flip hook");

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 
@@ -49,6 +50,116 @@ template <typename T> void safe_release(T*& ptr) noexcept {
 using D3DCompileFn = HRESULT(WINAPI*)(LPCVOID, SIZE_T, LPCSTR, const void*, void*, LPCSTR, LPCSTR,
                                       UINT, UINT, ID3DBlob**, ID3DBlob**);
 
+DXGI_FORMAT resolve_rtv_format(DXGI_FORMAT fmt) noexcept {
+  switch (fmt) {
+  case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    return DXGI_FORMAT_R8G8B8A8_UNORM;
+  case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    return DXGI_FORMAT_B8G8R8A8_UNORM;
+  case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    return DXGI_FORMAT_R10G10B10A2_UNORM;
+  case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    return DXGI_FORMAT_R16G16B16A16_FLOAT;
+  default:
+    return DXGI_FORMAT_UNKNOWN;
+  }
+}
+
+ID3D11RenderTargetView* create_backbuffer_rtv(ID3D11Device* dev, ID3D11Texture2D* back,
+                                              const D3D11_TEXTURE2D_DESC& desc) noexcept {
+  ID3D11RenderTargetView* rtv = nullptr;
+  const DXGI_FORMAT resolved = resolve_rtv_format(desc.Format);
+  if (resolved != DXGI_FORMAT_UNKNOWN) {
+    D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
+    rtv_desc.Format = resolved;
+    rtv_desc.ViewDimension = (desc.SampleDesc.Count > 1U) ? D3D11_RTV_DIMENSION_TEXTURE2DMS
+                                                          : D3D11_RTV_DIMENSION_TEXTURE2D;
+    if (SUCCEEDED(dev->CreateRenderTargetView(back, &rtv_desc, &rtv))) {
+      return rtv;
+    }
+    safe_release(rtv);
+  }
+  if (SUCCEEDED(dev->CreateRenderTargetView(back, nullptr, &rtv))) {
+    return rtv;
+  }
+  safe_release(rtv);
+  return nullptr;
+}
+
+constexpr std::array<uint32_t, sf::kHotkeyActionCount> kBackupNumpadVk{{
+    VK_NUMPAD9, // ToggleOverlay (F9)
+    VK_NUMPAD0, // ToggleMod (F10)
+    VK_NUMPAD1, // ToggleUpscaler (F11)
+    VK_NUMPAD8, // ToggleParticles (F8)
+    VK_NUMPAD2, // ToggleFrameCap (F12)
+}};
+
+constexpr std::array<uint32_t, sf::kHotkeyActionCount> kBackupCtrlDigitVk{{
+    '5', // ToggleOverlay (Ctrl+5)
+    '1', // ToggleMod (Ctrl+1)
+    '2', // ToggleUpscaler (Ctrl+2)
+    '3', // ToggleParticles (Ctrl+3)
+    '4', // ToggleFrameCap (Ctrl+4)
+}};
+
+std::atomic<bool> g_wndproc_hotkeys_enabled{false};
+std::array<std::atomic<uint32_t>, sf::kHotkeyActionCount> g_wndproc_vks{};
+std::atomic<uint32_t> g_wndproc_hotkey_mask{0U};
+HWND g_hooked_hwnd = nullptr;
+WNDPROC g_orig_wndproc = nullptr;
+
+LRESULT CALLBACK hooked_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+  if (g_wndproc_hotkeys_enabled.load(std::memory_order_relaxed) &&
+      (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && ((lparam & 0x40000000L) == 0)) {
+    const auto vk = static_cast<uint32_t>(wparam & 0xFFFFU);
+    const bool ctrl_down = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    for (size_t i = 0U; i < sf::kHotkeyActionCount; ++i) {
+      const uint32_t primary_vk = g_wndproc_vks[i].load(std::memory_order_relaxed);
+      if (primary_vk == 0U) {
+        continue;
+      }
+      const bool hit = (vk == primary_vk) || (vk == kBackupNumpadVk[i]) ||
+                       (ctrl_down && vk == kBackupCtrlDigitVk[i]);
+      if (hit) {
+        g_wndproc_hotkey_mask.fetch_or(1U << static_cast<uint32_t>(i), std::memory_order_relaxed);
+      }
+    }
+  }
+  WNDPROC orig = g_orig_wndproc;
+  return (orig != nullptr) ? CallWindowProcW(orig, hwnd, msg, wparam, lparam)
+                           : DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+void install_window_hook(IDXGISwapChain* sc) noexcept {
+  if (g_hooked_hwnd != nullptr || sc == nullptr) {
+    return;
+  }
+  DXGI_SWAP_CHAIN_DESC sc_desc{};
+  if (FAILED(sc->GetDesc(&sc_desc)) || sc_desc.OutputWindow == nullptr ||
+      !IsWindow(sc_desc.OutputWindow)) {
+    return;
+  }
+  const LONG_PTR prev = SetWindowLongPtrW(sc_desc.OutputWindow, GWLP_WNDPROC,
+                                          reinterpret_cast<LONG_PTR>(&hooked_wndproc));
+  if (prev != 0) {
+    g_orig_wndproc = reinterpret_cast<WNDPROC>(prev);
+    g_hooked_hwnd = sc_desc.OutputWindow;
+    SF_LOG("OverlayModule: hooked OutputWindow WndProc for hotkey capture");
+  }
+}
+
+void remove_window_hook() noexcept {
+  g_wndproc_hotkeys_enabled.store(false, std::memory_order_relaxed);
+  if (g_hooked_hwnd != nullptr && g_orig_wndproc != nullptr) {
+    if (IsWindow(g_hooked_hwnd)) {
+      SetWindowLongPtrW(g_hooked_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_orig_wndproc));
+    }
+    g_hooked_hwnd = nullptr;
+    g_orig_wndproc = nullptr;
+  }
+  g_wndproc_hotkey_mask.store(0U, std::memory_order_relaxed);
+}
+
 } // namespace
 
 struct OverlayModule::Impl {
@@ -74,8 +185,6 @@ struct OverlayModule::Impl {
   uint32_t hud_w = 0;
   uint32_t hud_h = 0;
 
-  ID3D11RenderTargetView* back_rtv = nullptr;
-  ID3D11Texture2D* last_backbuffer = nullptr;
   uint32_t cached_width = 0;
   uint32_t cached_height = 0;
 
@@ -83,13 +192,6 @@ struct OverlayModule::Impl {
   uint64_t hud_draws = 0;
   uint64_t hotkey_events = 0;
   uint64_t resizes = 0;
-
-  void release_targets() noexcept {
-    safe_release(back_rtv);
-    safe_release(last_backbuffer);
-    cached_width = 0;
-    cached_height = 0;
-  }
 
   void release_hud_texture() noexcept {
     safe_release(hud_srv);
@@ -99,7 +201,8 @@ struct OverlayModule::Impl {
   }
 
   void release_all() noexcept {
-    release_targets();
+    cached_width = 0;
+    cached_height = 0;
     release_hud_texture();
     safe_release(cull_none);
     safe_release(no_depth);
@@ -189,6 +292,7 @@ struct OverlayModule::Impl {
     D3D11_RASTERIZER_DESC rdesc{};
     rdesc.FillMode = D3D11_FILL_SOLID;
     rdesc.CullMode = D3D11_CULL_NONE;
+    rdesc.ScissorEnable = FALSE;
     rdesc.DepthClipEnable = TRUE;
     dev->CreateRasterizerState(&rdesc, &cull_none);
 
@@ -201,27 +305,6 @@ struct OverlayModule::Impl {
       pipeline_failed = true;
       return false;
     }
-    return true;
-  }
-
-  bool ensure_target(ID3D11Device* dev, ID3D11Texture2D* back, const D3D11_TEXTURE2D_DESC& desc) {
-    if (back_rtv != nullptr && cached_width == desc.Width && cached_height == desc.Height &&
-        last_backbuffer == back) {
-      return true;
-    }
-    const bool resized = (cached_width != 0U || cached_height != 0U);
-    release_targets();
-    if (resized) {
-      ++resizes;
-    }
-    if (FAILED(dev->CreateRenderTargetView(back, nullptr, &back_rtv)) || back_rtv == nullptr) {
-      release_targets();
-      return false;
-    }
-    last_backbuffer = back;
-    last_backbuffer->AddRef();
-    cached_width = desc.Width;
-    cached_height = desc.Height;
     return true;
   }
 
@@ -238,11 +321,11 @@ struct OverlayModule::Impl {
     snap.p1_low_ms = ctx.p1_low_ms;
     snap.spikes = ctx.spike_count;
     snap.mod_active = rc.is_mod_active();
-    snap.upscaler_configured = cfg.modules.upscaler;
+    snap.upscaler_configured = cfg.modules.upscaler || cfg.hotkeys.enabled;
     snap.upscaler_on = rc.upscaler_active.load(std::memory_order_relaxed);
-    snap.particles_configured = cfg.modules.particles;
+    snap.particles_configured = cfg.modules.particles || cfg.hotkeys.enabled;
     snap.particles_on = rc.particles_active.load(std::memory_order_relaxed);
-    snap.frame_cap_fps = (cfg.modules.presentation) ? cfg.present.max_fps : 0U;
+    snap.frame_cap_fps = (cfg.present.max_fps > 0U) ? cfg.present.max_fps : 60U;
     snap.frame_cap_on = rc.frame_cap_active.load(std::memory_order_relaxed);
     snap.key_overlay = sf::canonical_hotkey_label(cfg.hotkeys.toggle_overlay);
     snap.key_mod = sf::canonical_hotkey_label(cfg.hotkeys.toggle_mod);
@@ -303,6 +386,12 @@ bool OverlayModule::init(const sf::GameProfile&, const sf::Config& cfg) {
       sf::parse_virtual_key(cfg.hotkeys.toggle_particles),
       sf::parse_virtual_key(cfg.hotkeys.toggle_frame_cap),
   }};
+  for (size_t i = 0U; i < sf::kHotkeyActionCount; ++i) {
+    g_wndproc_vks[i].store(impl_->hotkeys_vk[i], std::memory_order_relaxed);
+  }
+  g_wndproc_hotkey_mask.store(0U, std::memory_order_relaxed);
+  g_wndproc_hotkeys_enabled.store(cfg.hotkeys.enabled, std::memory_order_relaxed);
+
   impl_->tracker.reset();
   impl_->elapsed_ms = 0.0;
   impl_->hud_dirty = true;
@@ -320,12 +409,24 @@ void OverlayModule::on_present(sf::PresentCtx& ctx) {
   ++impl_->frames_seen;
   impl_->elapsed_ms += (ctx.delta_ms > 0.0) ? ctx.delta_ms : 1.0;
 
+  auto* sc = static_cast<IDXGISwapChain*>(ctx.swap_chain);
   if (impl_->cfg.hotkeys.enabled) {
+    install_window_hook(sc);
+
+    const uint32_t wnd_mask = g_wndproc_hotkey_mask.exchange(0U, std::memory_order_relaxed);
+    const bool ctrl_down = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+
     std::array<bool, sf::kHotkeyActionCount> down{};
     for (size_t i = 0U; i < sf::kHotkeyActionCount; ++i) {
       const uint32_t vk = impl_->hotkeys_vk[i];
       if (vk != 0U) {
-        down[i] = (GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0;
+        const bool primary = (GetAsyncKeyState(static_cast<int>(vk)) & 0x8001) != 0;
+        const bool numpad = (GetAsyncKeyState(static_cast<int>(kBackupNumpadVk[i])) & 0x8001) != 0;
+        const bool ctrl_num =
+            ctrl_down &&
+            ((GetAsyncKeyState(static_cast<int>(kBackupCtrlDigitVk[i])) & 0x8001) != 0);
+        const bool from_wndproc = (wnd_mask & (1U << static_cast<uint32_t>(i))) != 0U;
+        down[i] = primary || numpad || ctrl_num || from_wndproc;
       }
     }
     for (const auto action : impl_->tracker.poll(down, impl_->elapsed_ms)) {
@@ -337,12 +438,10 @@ void OverlayModule::on_present(sf::PresentCtx& ctx) {
   }
 
   if (!sf::runtime_controls().is_overlay_visible() ||
-      (!impl_->cfg.overlay.show_fps && !impl_->cfg.overlay.show_status) ||
-      ctx.swap_chain == nullptr) {
+      (!impl_->cfg.overlay.show_fps && !impl_->cfg.overlay.show_status) || sc == nullptr) {
     return;
   }
 
-  auto* sc = static_cast<IDXGISwapChain*>(ctx.swap_chain);
   ID3D11Texture2D* back = nullptr;
   if (FAILED(sc->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&back))) ||
       back == nullptr) {
@@ -371,90 +470,123 @@ void OverlayModule::on_present(sf::PresentCtx& ctx) {
     return;
   }
 
-  if (impl_->ensure_pipeline(dev) && impl_->ensure_target(dev, back, back_desc) &&
-      impl_->ensure_hud_texture(dev, ctx)) {
-    const auto rect = fx::compute_hud_rect(
-        static_cast<uint32_t>(back_desc.Width), static_cast<uint32_t>(back_desc.Height),
-        impl_->hud_w, impl_->hud_h, impl_->cfg.overlay.scale, impl_->cfg.overlay.position);
+  if (impl_->ensure_pipeline(dev) && impl_->ensure_hud_texture(dev, ctx)) {
+    // Create and release a fresh RTV per Present() so DXGI ResizeBuffers never sees lingering
+    // references to Buffer(0).
+    ID3D11RenderTargetView* back_rtv = create_backbuffer_rtv(dev, back, back_desc);
+    if (back_rtv != nullptr) {
+      impl_->cached_width = static_cast<uint32_t>(back_desc.Width);
+      impl_->cached_height = static_cast<uint32_t>(back_desc.Height);
 
-    std::array<ID3D11RenderTargetView*, 1> prev_rtv{};
-    ID3D11DepthStencilView* prev_dsv = nullptr;
-    d3d_ctx->OMGetRenderTargets(1U, prev_rtv.data(), &prev_dsv);
+      const auto rect =
+          fx::compute_hud_rect(impl_->cached_width, impl_->cached_height, impl_->hud_w,
+                               impl_->hud_h, impl_->cfg.overlay.scale, impl_->cfg.overlay.position);
 
-    UINT prev_vp_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE> prev_vps{};
-    d3d_ctx->RSGetViewports(&prev_vp_count, prev_vps.data());
+      std::array<ID3D11RenderTargetView*, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT> prev_rtvs{};
+      ID3D11DepthStencilView* prev_dsv = nullptr;
+      d3d_ctx->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, prev_rtvs.data(),
+                                  &prev_dsv);
 
-    ID3D11VertexShader* prev_vs = nullptr;
-    ID3D11PixelShader* prev_ps = nullptr;
-    d3d_ctx->VSGetShader(&prev_vs, nullptr, nullptr);
-    d3d_ctx->PSGetShader(&prev_ps, nullptr, nullptr);
+      UINT prev_vp_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+      std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE>
+          prev_vps{};
+      d3d_ctx->RSGetViewports(&prev_vp_count, prev_vps.data());
 
-    ID3D11InputLayout* prev_il = nullptr;
-    D3D11_PRIMITIVE_TOPOLOGY prev_topo = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
-    d3d_ctx->IAGetInputLayout(&prev_il);
-    d3d_ctx->IAGetPrimitiveTopology(&prev_topo);
+      ID3D11VertexShader* prev_vs = nullptr;
+      ID3D11PixelShader* prev_ps = nullptr;
+      ID3D11GeometryShader* prev_gs = nullptr;
+      ID3D11HullShader* prev_hs = nullptr;
+      ID3D11DomainShader* prev_ds = nullptr;
+      d3d_ctx->VSGetShader(&prev_vs, nullptr, nullptr);
+      d3d_ctx->PSGetShader(&prev_ps, nullptr, nullptr);
+      d3d_ctx->GSGetShader(&prev_gs, nullptr, nullptr);
+      d3d_ctx->HSGetShader(&prev_hs, nullptr, nullptr);
+      d3d_ctx->DSGetShader(&prev_ds, nullptr, nullptr);
 
-    ID3D11BlendState* prev_blend = nullptr;
-    std::array<FLOAT, 4> prev_blend_factor{};
-    UINT prev_sample_mask = 0;
-    d3d_ctx->OMGetBlendState(&prev_blend, prev_blend_factor.data(), &prev_sample_mask);
+      ID3D11InputLayout* prev_il = nullptr;
+      D3D11_PRIMITIVE_TOPOLOGY prev_topo = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+      d3d_ctx->IAGetInputLayout(&prev_il);
+      d3d_ctx->IAGetPrimitiveTopology(&prev_topo);
 
-    ID3D11DepthStencilState* prev_dss = nullptr;
-    UINT prev_stencil = 0;
-    d3d_ctx->OMGetDepthStencilState(&prev_dss, &prev_stencil);
+      ID3D11BlendState* prev_blend = nullptr;
+      std::array<FLOAT, 4> prev_blend_factor{};
+      UINT prev_sample_mask = 0;
+      d3d_ctx->OMGetBlendState(&prev_blend, prev_blend_factor.data(), &prev_sample_mask);
 
-    ID3D11RasterizerState* prev_rs = nullptr;
-    d3d_ctx->RSGetState(&prev_rs);
+      ID3D11DepthStencilState* prev_dss = nullptr;
+      UINT prev_stencil = 0;
+      d3d_ctx->OMGetDepthStencilState(&prev_dss, &prev_stencil);
 
-    std::array<ID3D11ShaderResourceView*, 1> prev_srv{};
-    std::array<ID3D11SamplerState*, 1> prev_samp{};
-    d3d_ctx->PSGetShaderResources(0U, 1U, prev_srv.data());
-    d3d_ctx->PSGetSamplers(0U, 1U, prev_samp.data());
+      ID3D11RasterizerState* prev_rs = nullptr;
+      d3d_ctx->RSGetState(&prev_rs);
 
-    D3D11_VIEWPORT vp{rect.x, rect.y, rect.width, rect.height, 0.0f, 1.0f};
-    d3d_ctx->RSSetViewports(1U, &vp);
-    d3d_ctx->RSSetState(impl_->cull_none);
-    d3d_ctx->OMSetRenderTargets(1U, &impl_->back_rtv, nullptr);
-    d3d_ctx->OMSetBlendState(impl_->alpha_blend, nullptr, 0xffffffffU);
-    d3d_ctx->OMSetDepthStencilState(impl_->no_depth, 0U);
-    d3d_ctx->IASetInputLayout(nullptr);
-    d3d_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    d3d_ctx->VSSetShader(impl_->vs, nullptr, 0U);
-    d3d_ctx->PSSetShader(impl_->ps, nullptr, 0U);
-    d3d_ctx->PSSetShaderResources(0U, 1U, &impl_->hud_srv);
-    d3d_ctx->PSSetSamplers(0U, 1U, &impl_->point_sampler);
-    d3d_ctx->Draw(3U, 0U);
+      std::array<ID3D11ShaderResourceView*, 1> prev_srv{};
+      std::array<ID3D11SamplerState*, 1> prev_samp{};
+      d3d_ctx->PSGetShaderResources(0U, 1U, prev_srv.data());
+      d3d_ctx->PSGetSamplers(0U, 1U, prev_samp.data());
 
-    ID3D11ShaderResourceView* null_srv = nullptr;
-    d3d_ctx->PSSetShaderResources(0U, 1U, &null_srv);
+      D3D11_VIEWPORT vp{rect.x, rect.y, rect.width, rect.height, 0.0f, 1.0f};
+      d3d_ctx->RSSetViewports(1U, &vp);
+      d3d_ctx->RSSetState(impl_->cull_none);
+      d3d_ctx->OMSetRenderTargets(1U, &back_rtv, nullptr);
+      d3d_ctx->OMSetBlendState(impl_->alpha_blend, nullptr, 0xffffffffU);
+      d3d_ctx->OMSetDepthStencilState(impl_->no_depth, 0U);
+      d3d_ctx->IASetInputLayout(nullptr);
+      d3d_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+      d3d_ctx->VSSetShader(impl_->vs, nullptr, 0U);
+      d3d_ctx->PSSetShader(impl_->ps, nullptr, 0U);
+      d3d_ctx->GSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->HSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->DSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->PSSetShaderResources(0U, 1U, &impl_->hud_srv);
+      d3d_ctx->PSSetSamplers(0U, 1U, &impl_->point_sampler);
+      d3d_ctx->Draw(3U, 0U);
 
-    d3d_ctx->OMSetRenderTargets(1U, prev_rtv.data(), prev_dsv);
-    if (prev_vp_count > 0U) {
-      d3d_ctx->RSSetViewports(prev_vp_count, prev_vps.data());
+      ID3D11ShaderResourceView* null_srv = nullptr;
+      d3d_ctx->PSSetShaderResources(0U, 1U, &null_srv);
+
+      d3d_ctx->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, prev_rtvs.data(),
+                                  prev_dsv);
+      if (prev_vp_count > 0U) {
+        d3d_ctx->RSSetViewports(prev_vp_count, prev_vps.data());
+      } else {
+        D3D11_VIEWPORT full_vp{
+            0.0f, 0.0f, static_cast<FLOAT>(back_desc.Width), static_cast<FLOAT>(back_desc.Height),
+            0.0f, 1.0f};
+        d3d_ctx->RSSetViewports(1U, &full_vp);
+      }
+      d3d_ctx->RSSetState(prev_rs);
+      d3d_ctx->VSSetShader(prev_vs, nullptr, 0U);
+      d3d_ctx->PSSetShader(prev_ps, nullptr, 0U);
+      d3d_ctx->GSSetShader(prev_gs, nullptr, 0U);
+      d3d_ctx->HSSetShader(prev_hs, nullptr, 0U);
+      d3d_ctx->DSSetShader(prev_ds, nullptr, 0U);
+      d3d_ctx->IASetInputLayout(prev_il);
+      d3d_ctx->IASetPrimitiveTopology(prev_topo);
+      d3d_ctx->OMSetBlendState(prev_blend, prev_blend_factor.data(), prev_sample_mask);
+      d3d_ctx->OMSetDepthStencilState(prev_dss, prev_stencil);
+      d3d_ctx->PSSetShaderResources(0U, 1U, prev_srv.data());
+      d3d_ctx->PSSetSamplers(0U, 1U, prev_samp.data());
+
+      for (auto*& rtv : prev_rtvs) {
+        safe_release(rtv);
+      }
+      safe_release(prev_dsv);
+      safe_release(prev_vs);
+      safe_release(prev_ps);
+      safe_release(prev_gs);
+      safe_release(prev_hs);
+      safe_release(prev_ds);
+      safe_release(prev_il);
+      safe_release(prev_blend);
+      safe_release(prev_dss);
+      safe_release(prev_rs);
+      safe_release(prev_srv[0]);
+      safe_release(prev_samp[0]);
+      back_rtv->Release();
+
+      ++impl_->hud_draws;
     }
-    d3d_ctx->RSSetState(prev_rs);
-    d3d_ctx->VSSetShader(prev_vs, nullptr, 0U);
-    d3d_ctx->PSSetShader(prev_ps, nullptr, 0U);
-    d3d_ctx->IASetInputLayout(prev_il);
-    d3d_ctx->IASetPrimitiveTopology(prev_topo);
-    d3d_ctx->OMSetBlendState(prev_blend, prev_blend_factor.data(), prev_sample_mask);
-    d3d_ctx->OMSetDepthStencilState(prev_dss, prev_stencil);
-    d3d_ctx->PSSetShaderResources(0U, 1U, prev_srv.data());
-    d3d_ctx->PSSetSamplers(0U, 1U, prev_samp.data());
-
-    safe_release(prev_rtv[0]);
-    safe_release(prev_dsv);
-    safe_release(prev_vs);
-    safe_release(prev_ps);
-    safe_release(prev_il);
-    safe_release(prev_blend);
-    safe_release(prev_dss);
-    safe_release(prev_rs);
-    safe_release(prev_srv[0]);
-    safe_release(prev_samp[0]);
-
-    ++impl_->hud_draws;
   }
 
   d3d_ctx->Release();
@@ -469,7 +601,8 @@ void OverlayModule::on_resize() {
   if (impl_->cached_width != 0U || impl_->cached_height != 0U) {
     ++impl_->resizes;
   }
-  impl_->release_targets();
+  impl_->cached_width = 0U;
+  impl_->cached_height = 0U;
 }
 
 void OverlayModule::shutdown() {
@@ -477,6 +610,7 @@ void OverlayModule::shutdown() {
     return;
   }
   impl_->active = false;
+  remove_window_hook();
   impl_->release_all();
   SF_LOG("OverlayModule shutdown (frames=%llu, hud_draws=%llu, hotkey_events=%llu, resizes=%llu)",
          static_cast<unsigned long long>(impl_->frames_seen),

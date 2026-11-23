@@ -55,10 +55,6 @@ sf::RenderProfile g_profile{};
 sf::Config g_cfg = sf::Config::defaults();
 sf::games::ds3::ParticlePassPolicy g_policy;
 
-thread_local UINT t_saved_vp_count = 0;
-thread_local std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE>
-    t_saved_vps{};
-
 void inspect_rtv_dims(ID3D11RenderTargetView* rtv, uint32_t* out_w, uint32_t* out_h) noexcept {
   if (rtv == nullptr) {
     return;
@@ -312,10 +308,9 @@ DrawFilterDecision filter_d3d11_draw(void* device_context, uint32_t vertex_or_in
   DrawFilterDecision out{};
   out.effective_instance_count =
       is_instanced ? std::max<uint32_t>(1U, instance_count) : instance_count;
-  t_saved_vp_count = 0;
 
-  if (!g_active.load(std::memory_order_relaxed) || !sf::runtime_controls().should_run_particles() ||
-      device_context == nullptr) {
+  if (!is_instanced || !g_active.load(std::memory_order_relaxed) ||
+      !sf::runtime_controls().should_run_particles() || device_context == nullptr) {
     return out;
   }
 
@@ -334,35 +329,18 @@ DrawFilterDecision filter_d3d11_draw(void* device_context, uint32_t vertex_or_in
 
   out.skip_draw = action.skip_draw;
   out.effective_instance_count = action.effective_instance_count;
-  if (action.skip_draw || !action.scale_viewport) {
-    return out;
-  }
-
-  UINT num_vps = static_cast<UINT>(t_saved_vps.size());
-  ctx->RSGetViewports(&num_vps, t_saved_vps.data());
-  if (num_vps > 0U && num_vps <= t_saved_vps.size()) {
-    t_saved_vp_count = num_vps;
-    auto scaled_vps = t_saved_vps;
-    scaled_vps[0].Width = static_cast<FLOAT>(action.viewport.scaled_width);
-    scaled_vps[0].Height = static_cast<FLOAT>(action.viewport.scaled_height);
-    ctx->RSSetViewports(num_vps, scaled_vps.data());
-    out.viewport_scaled = true;
-  }
+  out.viewport_scaled = action.scale_viewport;
   return out;
 }
 
 void finish_d3d11_draw(void* device_context, const DrawFilterDecision& decision) noexcept {
-  if (!decision.viewport_scaled || device_context == nullptr || t_saved_vp_count == 0U) {
-    t_saved_vp_count = 0;
-    return;
-  }
-  auto* ctx = static_cast<ID3D11DeviceContext*>(device_context);
-  ctx->RSSetViewports(t_saved_vp_count, t_saved_vps.data());
-  t_saved_vp_count = 0;
+  static_cast<void>(device_context);
+  static_cast<void>(decision);
 }
 
 struct ParticleModule::Impl {
   bool active = false;
+  bool standby_only = false;
 };
 
 ParticleModule::ParticleModule() : impl_(std::make_unique<Impl>()) {}
@@ -374,11 +352,17 @@ bool ParticleModule::init(const sf::GameProfile& profile, const sf::Config& cfg)
     std::lock_guard lk(g_policy_mu);
     g_profile = profile.render;
     g_cfg = cfg;
+    g_cfg.modules.particles = true;
     g_policy = sf::games::ds3::ParticlePassPolicy{};
   }
 
-  if (!install_standalone_hooks()) {
-    return false;
+  if (cfg.modules.particles) {
+    if (!install_standalone_hooks()) {
+      return false;
+    }
+    impl_->standby_only = false;
+  } else {
+    impl_->standby_only = true;
   }
 
   g_active.store(true, std::memory_order_release);
@@ -392,6 +376,11 @@ bool ParticleModule::init(const sf::GameProfile& profile, const sf::Config& cfg)
 void ParticleModule::on_present(sf::PresentCtx& ctx) {
   if (!impl_->active) {
     return;
+  }
+  if (impl_->standby_only && sf::runtime_controls().should_run_particles()) {
+    if (install_standalone_hooks()) {
+      impl_->standby_only = false;
+    }
   }
   std::lock_guard lk(g_policy_mu);
   g_policy.begin_frame(ctx.frame_index + 1U);

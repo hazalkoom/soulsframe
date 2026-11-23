@@ -3,13 +3,15 @@
 #include "core/log.h"
 #include "core/module_registry.h"
 #include "core/win_helpers.h"
+#include "gfx/d3d11/presentation_module.h"
 #include "timing/frame_stats.h"
 
 #include <MinHook.h>
 #include <d3d11.h>
-#include <dxgi.h>
+#include <dxgi1_5.h>
 #include <windows.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -75,7 +77,57 @@ HRESULT STDMETHODCALLTYPE hooked_present(IDXGISwapChain* sc, UINT sync_interval,
     effective_flags = static_cast<UINT>(ctx.present_flags);
   }
 
-  return g_orig_present(sc, effective_sync, effective_flags);
+  ID3D11Device* flip_dev = nullptr;
+  ID3D11DeviceContext* flip_ctx = nullptr;
+  std::array<ID3D11RenderTargetView*, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT> saved_rtvs{};
+  ID3D11DepthStencilView* saved_dsv = nullptr;
+  bool has_saved_targets = false;
+
+  if (is_flip_model_active() && sc != nullptr &&
+      SUCCEEDED(sc->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void**>(&flip_dev))) &&
+      flip_dev != nullptr) {
+    flip_dev->GetImmediateContext(&flip_ctx);
+    if (flip_ctx != nullptr) {
+      flip_ctx->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, saved_rtvs.data(),
+                                   &saved_dsv);
+      has_saved_targets = (saved_dsv != nullptr);
+      if (!has_saved_targets) {
+        for (const auto* rtv : saved_rtvs) {
+          if (rtv != nullptr) {
+            has_saved_targets = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  const HRESULT hr = g_orig_present(sc, effective_sync, effective_flags);
+
+  if (flip_ctx != nullptr) {
+    // FLIP_DISCARD Present() unbinds swapchain RTVs on the immediate context; re-bind caller
+    // targets so engines that keep them bound across frames do not render to null targets.
+    if (has_saved_targets) {
+      flip_ctx->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, saved_rtvs.data(),
+                                   saved_dsv);
+    }
+    for (auto*& rtv : saved_rtvs) {
+      if (rtv != nullptr) {
+        rtv->Release();
+        rtv = nullptr;
+      }
+    }
+    if (saved_dsv != nullptr) {
+      saved_dsv->Release();
+      saved_dsv = nullptr;
+    }
+    flip_ctx->Release();
+  }
+  if (flip_dev != nullptr) {
+    flip_dev->Release();
+  }
+
+  return hr;
 }
 
 /// Intercepts `IDXGISwapChain::ResizeBuffers` (slot 13) so modules release resolution-dependent
@@ -87,6 +139,16 @@ HRESULT STDMETHODCALLTYPE hooked_resize_buffers(IDXGISwapChain* sc, UINT buffer_
          buffer_count, static_cast<unsigned>(new_format), swapchain_flags);
   if (g_registry) {
     g_registry->on_resize();
+  }
+  if (is_flip_model_active()) {
+    const UINT eff_buffers = (buffer_count == 1U) ? 2U : buffer_count;
+    const UINT eff_flags = is_tearing_flag_active()
+                               ? (swapchain_flags | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+                               : swapchain_flags;
+    const HRESULT hr = g_orig_resize(sc, eff_buffers, width, height, new_format, eff_flags);
+    if (SUCCEEDED(hr)) {
+      return hr;
+    }
   }
   return g_orig_resize(sc, buffer_count, width, height, new_format, swapchain_flags);
 }

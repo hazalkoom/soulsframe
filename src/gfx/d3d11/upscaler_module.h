@@ -18,7 +18,9 @@ public:
   ~UpscalerModule() override;
 
   const char* name() const override { return "upscaler"; }
-  bool is_enabled(const sf::Config& cfg) const override { return cfg.modules.upscaler; }
+  bool is_enabled(const sf::Config& cfg) const override {
+    return cfg.modules.upscaler || (cfg.modules.overlay && cfg.hotkeys.enabled);
+  }
   bool init(const sf::GameProfile& profile, const sf::Config& cfg) override;
   void on_present(sf::PresentCtx& ctx) override;
   void on_resize() override;

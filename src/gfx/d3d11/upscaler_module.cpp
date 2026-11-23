@@ -72,9 +72,9 @@ float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
 
   float mn = min(lc, min(min(ln, ls), min(lw, le)));
   float mx = max(lc, max(max(ln, ls), max(lw, le)));
-  float hit_min = mn / max(4.0f * mx, 1e-5f);
-  float hit_max = (1.0f - mx) / max(4.0f * mn - 4.0f, -1e-5f);
-  float lobe = max(-0.1875f, clamp(max(hit_min, hit_max), -0.1875f, 0.0f)) * rcas_con0.x;
+  float hit_min = -mn / max(4.0f * mx, 1e-5f);
+  float hit_max = (1.0f - mx) / min(4.0f * mn - 4.0f, -1e-5f);
+  float lobe = max(-0.1875f, min(max(hit_min, hit_max), 0.0f)) * rcas_con0.x;
   float3 color = (center + lobe * (n + s + w + e)) / max(1.0f + 4.0f * lobe, 1e-4f);
   return float4(saturate(color), 1.0f);
 }
@@ -90,6 +90,41 @@ template <typename T> void safe_release(T*& ptr) noexcept {
 using D3DCompileFn = HRESULT(WINAPI*)(LPCVOID, SIZE_T, LPCSTR, const void*, void*, LPCSTR, LPCSTR,
                                       UINT, UINT, ID3DBlob**, ID3DBlob**);
 
+DXGI_FORMAT resolve_rtv_format(DXGI_FORMAT fmt) noexcept {
+  switch (fmt) {
+  case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    return DXGI_FORMAT_R8G8B8A8_UNORM;
+  case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    return DXGI_FORMAT_B8G8R8A8_UNORM;
+  case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    return DXGI_FORMAT_R10G10B10A2_UNORM;
+  case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    return DXGI_FORMAT_R16G16B16A16_FLOAT;
+  default:
+    return DXGI_FORMAT_UNKNOWN;
+  }
+}
+
+ID3D11RenderTargetView* create_backbuffer_rtv(ID3D11Device* dev, ID3D11Texture2D* back,
+                                              DXGI_FORMAT fmt) noexcept {
+  ID3D11RenderTargetView* rtv = nullptr;
+  const DXGI_FORMAT resolved = resolve_rtv_format(fmt);
+  if (resolved != DXGI_FORMAT_UNKNOWN) {
+    D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
+    rtv_desc.Format = resolved;
+    rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    if (SUCCEEDED(dev->CreateRenderTargetView(back, &rtv_desc, &rtv))) {
+      return rtv;
+    }
+    safe_release(rtv);
+  }
+  if (SUCCEEDED(dev->CreateRenderTargetView(back, nullptr, &rtv))) {
+    return rtv;
+  }
+  safe_release(rtv);
+  return nullptr;
+}
+
 } // namespace
 
 struct UpscalerModule::Impl {
@@ -102,11 +137,10 @@ struct UpscalerModule::Impl {
   ID3D11PixelShader* ps = nullptr;
   ID3D11SamplerState* linear_sampler = nullptr;
   ID3D11Buffer* cbuffer = nullptr;
+  ID3D11RasterizerState* cull_none = nullptr;
 
   ID3D11Texture2D* src_copy = nullptr;
   ID3D11ShaderResourceView* src_srv = nullptr;
-  ID3D11RenderTargetView* back_rtv = nullptr;
-  ID3D11Texture2D* last_backbuffer = nullptr;
   uint32_t cached_width = 0;
   uint32_t cached_height = 0;
   DXGI_FORMAT cached_format = DXGI_FORMAT_UNKNOWN;
@@ -117,8 +151,6 @@ struct UpscalerModule::Impl {
   uint64_t resizes = 0;
 
   void release_targets() noexcept {
-    safe_release(back_rtv);
-    safe_release(last_backbuffer);
     safe_release(src_srv);
     safe_release(src_copy);
     cached_width = 0;
@@ -128,6 +160,7 @@ struct UpscalerModule::Impl {
 
   void release_all() noexcept {
     release_targets();
+    safe_release(cull_none);
     safe_release(cbuffer);
     safe_release(linear_sampler);
     safe_release(ps);
@@ -136,7 +169,8 @@ struct UpscalerModule::Impl {
   }
 
   bool ensure_shaders(ID3D11Device* dev) {
-    if (vs != nullptr && ps != nullptr && linear_sampler != nullptr && cbuffer != nullptr) {
+    if (vs != nullptr && ps != nullptr && linear_sampler != nullptr && cbuffer != nullptr &&
+        cull_none != nullptr) {
       return true;
     }
     if (pipeline_failed) {
@@ -200,10 +234,18 @@ struct UpscalerModule::Impl {
     bdesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     dev->CreateBuffer(&bdesc, nullptr, &cbuffer);
 
+    D3D11_RASTERIZER_DESC rdesc{};
+    rdesc.FillMode = D3D11_FILL_SOLID;
+    rdesc.CullMode = D3D11_CULL_NONE;
+    rdesc.ScissorEnable = FALSE;
+    rdesc.DepthClipEnable = TRUE;
+    dev->CreateRasterizerState(&rdesc, &cull_none);
+
     device = dev;
     device->AddRef();
 
-    if (vs == nullptr || ps == nullptr || linear_sampler == nullptr || cbuffer == nullptr) {
+    if (vs == nullptr || ps == nullptr || linear_sampler == nullptr || cbuffer == nullptr ||
+        cull_none == nullptr) {
       release_all();
       pipeline_failed = true;
       return false;
@@ -211,9 +253,9 @@ struct UpscalerModule::Impl {
     return true;
   }
 
-  bool ensure_targets(ID3D11Device* dev, ID3D11Texture2D* back, const D3D11_TEXTURE2D_DESC& desc) {
-    if (src_copy != nullptr && cached_width == desc.Width && cached_height == desc.Height &&
-        cached_format == desc.Format && last_backbuffer == back) {
+  bool ensure_targets(ID3D11Device* dev, const D3D11_TEXTURE2D_DESC& desc) {
+    if (src_copy != nullptr && src_srv != nullptr && cached_width == desc.Width &&
+        cached_height == desc.Height && cached_format == desc.Format) {
       return true;
     }
 
@@ -237,13 +279,7 @@ struct UpscalerModule::Impl {
       release_targets();
       return false;
     }
-    if (FAILED(dev->CreateRenderTargetView(back, nullptr, &back_rtv)) || back_rtv == nullptr) {
-      release_targets();
-      return false;
-    }
 
-    last_backbuffer = back;
-    last_backbuffer->AddRef();
     cached_width = desc.Width;
     cached_height = desc.Height;
     cached_format = desc.Format;
@@ -301,109 +337,143 @@ void UpscalerModule::on_present(sf::PresentCtx& ctx) {
     return;
   }
 
-  if (impl_->ensure_shaders(dev) && impl_->ensure_targets(dev, back, back_desc)) {
-    const auto dims =
-        fx::compute_upscale_dimensions(static_cast<uint32_t>(back_desc.Width),
-                                       static_cast<uint32_t>(back_desc.Height), impl_->cfg);
+  if (impl_->ensure_shaders(dev) && impl_->ensure_targets(dev, back_desc)) {
+    ID3D11RenderTargetView* back_rtv = create_backbuffer_rtv(dev, back, back_desc.Format);
+    if (back_rtv != nullptr) {
+      const auto dims =
+          fx::compute_upscale_dimensions(static_cast<uint32_t>(back_desc.Width),
+                                         static_cast<uint32_t>(back_desc.Height), impl_->cfg);
 
-    UpscalerCbData cb{};
-    cb.easu =
-        fx::compute_easu_constants(dims.render_width, dims.render_height, dims.display_width,
-                                   dims.display_height, dims.display_width, dims.display_height);
-    cb.rcas = fx::compute_rcas_constants(dims.display_width, dims.display_height,
-                                         impl_->cfg.sharpness_percent);
-    cb.flags = {dims.easu_active ? 1U : 0U, dims.rcas_active ? 1U : 0U, 0U, 0U};
+      UpscalerCbData cb{};
+      cb.easu =
+          fx::compute_easu_constants(dims.render_width, dims.render_height, dims.display_width,
+                                     dims.display_height, dims.display_width, dims.display_height);
+      cb.rcas = fx::compute_rcas_constants(dims.display_width, dims.display_height,
+                                           impl_->cfg.sharpness_percent);
+      cb.flags = {dims.easu_active ? 1U : 0U, dims.rcas_active ? 1U : 0U, 0U, 0U};
 
-    // Save pipeline state we touch so game/testbed rendering state stays intact.
-    std::array<ID3D11RenderTargetView*, 1> prev_rtv{};
-    ID3D11DepthStencilView* prev_dsv = nullptr;
-    d3d_ctx->OMGetRenderTargets(1U, prev_rtv.data(), &prev_dsv);
+      // Save all pipeline state we touch so game rendering state stays intact.
+      std::array<ID3D11RenderTargetView*, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT> prev_rtvs{};
+      ID3D11DepthStencilView* prev_dsv = nullptr;
+      d3d_ctx->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, prev_rtvs.data(),
+                                  &prev_dsv);
 
-    UINT prev_vp_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE> prev_vps{};
-    d3d_ctx->RSGetViewports(&prev_vp_count, prev_vps.data());
+      UINT prev_vp_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+      std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE>
+          prev_vps{};
+      d3d_ctx->RSGetViewports(&prev_vp_count, prev_vps.data());
 
-    ID3D11VertexShader* prev_vs = nullptr;
-    ID3D11PixelShader* prev_ps = nullptr;
-    d3d_ctx->VSGetShader(&prev_vs, nullptr, nullptr);
-    d3d_ctx->PSGetShader(&prev_ps, nullptr, nullptr);
+      ID3D11RasterizerState* prev_rs = nullptr;
+      d3d_ctx->RSGetState(&prev_rs);
 
-    ID3D11InputLayout* prev_il = nullptr;
-    D3D11_PRIMITIVE_TOPOLOGY prev_topo = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
-    d3d_ctx->IAGetInputLayout(&prev_il);
-    d3d_ctx->IAGetPrimitiveTopology(&prev_topo);
+      ID3D11VertexShader* prev_vs = nullptr;
+      ID3D11PixelShader* prev_ps = nullptr;
+      ID3D11GeometryShader* prev_gs = nullptr;
+      ID3D11HullShader* prev_hs = nullptr;
+      ID3D11DomainShader* prev_ds = nullptr;
+      d3d_ctx->VSGetShader(&prev_vs, nullptr, nullptr);
+      d3d_ctx->PSGetShader(&prev_ps, nullptr, nullptr);
+      d3d_ctx->GSGetShader(&prev_gs, nullptr, nullptr);
+      d3d_ctx->HSGetShader(&prev_hs, nullptr, nullptr);
+      d3d_ctx->DSGetShader(&prev_ds, nullptr, nullptr);
 
-    ID3D11BlendState* prev_blend = nullptr;
-    std::array<FLOAT, 4> prev_blend_factor{};
-    UINT prev_sample_mask = 0;
-    d3d_ctx->OMGetBlendState(&prev_blend, prev_blend_factor.data(), &prev_sample_mask);
+      ID3D11InputLayout* prev_il = nullptr;
+      D3D11_PRIMITIVE_TOPOLOGY prev_topo = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+      d3d_ctx->IAGetInputLayout(&prev_il);
+      d3d_ctx->IAGetPrimitiveTopology(&prev_topo);
 
-    ID3D11DepthStencilState* prev_dss = nullptr;
-    UINT prev_stencil = 0;
-    d3d_ctx->OMGetDepthStencilState(&prev_dss, &prev_stencil);
+      ID3D11BlendState* prev_blend = nullptr;
+      std::array<FLOAT, 4> prev_blend_factor{};
+      UINT prev_sample_mask = 0;
+      d3d_ctx->OMGetBlendState(&prev_blend, prev_blend_factor.data(), &prev_sample_mask);
 
-    std::array<ID3D11ShaderResourceView*, 1> prev_srv{};
-    std::array<ID3D11SamplerState*, 1> prev_samp{};
-    std::array<ID3D11Buffer*, 1> prev_cb{};
-    d3d_ctx->PSGetShaderResources(0U, 1U, prev_srv.data());
-    d3d_ctx->PSGetSamplers(0U, 1U, prev_samp.data());
-    d3d_ctx->PSGetConstantBuffers(0U, 1U, prev_cb.data());
+      ID3D11DepthStencilState* prev_dss = nullptr;
+      UINT prev_stencil = 0;
+      d3d_ctx->OMGetDepthStencilState(&prev_dss, &prev_stencil);
 
-    d3d_ctx->CopyResource(impl_->src_copy, back);
-    d3d_ctx->UpdateSubresource(impl_->cbuffer, 0U, nullptr, &cb, 0U, 0U);
+      std::array<ID3D11ShaderResourceView*, 1> prev_srv{};
+      std::array<ID3D11SamplerState*, 1> prev_samp{};
+      std::array<ID3D11Buffer*, 1> prev_cb{};
+      d3d_ctx->PSGetShaderResources(0U, 1U, prev_srv.data());
+      d3d_ctx->PSGetSamplers(0U, 1U, prev_samp.data());
+      d3d_ctx->PSGetConstantBuffers(0U, 1U, prev_cb.data());
 
-    D3D11_VIEWPORT vp{
-        0.0f, 0.0f, static_cast<FLOAT>(back_desc.Width), static_cast<FLOAT>(back_desc.Height),
-        0.0f, 1.0f};
-    d3d_ctx->RSSetViewports(1U, &vp);
-    d3d_ctx->OMSetRenderTargets(1U, &impl_->back_rtv, nullptr);
-    d3d_ctx->OMSetBlendState(nullptr, nullptr, 0xffffffffU);
-    d3d_ctx->OMSetDepthStencilState(nullptr, 0U);
-    d3d_ctx->IASetInputLayout(nullptr);
-    d3d_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    d3d_ctx->VSSetShader(impl_->vs, nullptr, 0U);
-    d3d_ctx->PSSetShader(impl_->ps, nullptr, 0U);
-    d3d_ctx->PSSetShaderResources(0U, 1U, &impl_->src_srv);
-    d3d_ctx->PSSetSamplers(0U, 1U, &impl_->linear_sampler);
-    d3d_ctx->PSSetConstantBuffers(0U, 1U, &impl_->cbuffer);
-    d3d_ctx->Draw(3U, 0U);
+      // Unbind swapchain RTV before copying backbuffer into src_copy.
+      d3d_ctx->OMSetRenderTargets(0U, nullptr, nullptr);
+      d3d_ctx->CopyResource(impl_->src_copy, back);
+      d3d_ctx->UpdateSubresource(impl_->cbuffer, 0U, nullptr, &cb, 0U, 0U);
 
-    // Unbind SRV before next frame's CopyResource.
-    ID3D11ShaderResourceView* null_srv = nullptr;
-    d3d_ctx->PSSetShaderResources(0U, 1U, &null_srv);
+      D3D11_VIEWPORT vp{
+          0.0f, 0.0f, static_cast<FLOAT>(back_desc.Width), static_cast<FLOAT>(back_desc.Height),
+          0.0f, 1.0f};
+      d3d_ctx->RSSetViewports(1U, &vp);
+      d3d_ctx->RSSetState(impl_->cull_none);
+      d3d_ctx->OMSetRenderTargets(1U, &back_rtv, nullptr);
+      d3d_ctx->OMSetBlendState(nullptr, nullptr, 0xffffffffU);
+      d3d_ctx->OMSetDepthStencilState(nullptr, 0U);
+      d3d_ctx->IASetInputLayout(nullptr);
+      d3d_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+      d3d_ctx->VSSetShader(impl_->vs, nullptr, 0U);
+      d3d_ctx->PSSetShader(impl_->ps, nullptr, 0U);
+      d3d_ctx->GSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->HSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->DSSetShader(nullptr, nullptr, 0U);
+      d3d_ctx->PSSetShaderResources(0U, 1U, &impl_->src_srv);
+      d3d_ctx->PSSetSamplers(0U, 1U, &impl_->linear_sampler);
+      d3d_ctx->PSSetConstantBuffers(0U, 1U, &impl_->cbuffer);
+      d3d_ctx->Draw(3U, 0U);
 
-    // Restore caller state.
-    d3d_ctx->OMSetRenderTargets(1U, prev_rtv.data(), prev_dsv);
-    if (prev_vp_count > 0U) {
-      d3d_ctx->RSSetViewports(prev_vp_count, prev_vps.data());
-    }
-    d3d_ctx->VSSetShader(prev_vs, nullptr, 0U);
-    d3d_ctx->PSSetShader(prev_ps, nullptr, 0U);
-    d3d_ctx->IASetInputLayout(prev_il);
-    d3d_ctx->IASetPrimitiveTopology(prev_topo);
-    d3d_ctx->OMSetBlendState(prev_blend, prev_blend_factor.data(), prev_sample_mask);
-    d3d_ctx->OMSetDepthStencilState(prev_dss, prev_stencil);
-    d3d_ctx->PSSetShaderResources(0U, 1U, prev_srv.data());
-    d3d_ctx->PSSetSamplers(0U, 1U, prev_samp.data());
-    d3d_ctx->PSSetConstantBuffers(0U, 1U, prev_cb.data());
+      // Unbind SRV before next frame's CopyResource.
+      ID3D11ShaderResourceView* null_srv = nullptr;
+      d3d_ctx->PSSetShaderResources(0U, 1U, &null_srv);
 
-    safe_release(prev_rtv[0]);
-    safe_release(prev_dsv);
-    safe_release(prev_vs);
-    safe_release(prev_ps);
-    safe_release(prev_il);
-    safe_release(prev_blend);
-    safe_release(prev_dss);
-    safe_release(prev_srv[0]);
-    safe_release(prev_samp[0]);
-    safe_release(prev_cb[0]);
+      // Restore caller state.
+      d3d_ctx->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, prev_rtvs.data(),
+                                  prev_dsv);
+      if (prev_vp_count > 0U) {
+        d3d_ctx->RSSetViewports(prev_vp_count, prev_vps.data());
+      } else {
+        d3d_ctx->RSSetViewports(1U, &vp);
+      }
+      d3d_ctx->RSSetState(prev_rs);
+      d3d_ctx->VSSetShader(prev_vs, nullptr, 0U);
+      d3d_ctx->PSSetShader(prev_ps, nullptr, 0U);
+      d3d_ctx->GSSetShader(prev_gs, nullptr, 0U);
+      d3d_ctx->HSSetShader(prev_hs, nullptr, 0U);
+      d3d_ctx->DSSetShader(prev_ds, nullptr, 0U);
+      d3d_ctx->IASetInputLayout(prev_il);
+      d3d_ctx->IASetPrimitiveTopology(prev_topo);
+      d3d_ctx->OMSetBlendState(prev_blend, prev_blend_factor.data(), prev_sample_mask);
+      d3d_ctx->OMSetDepthStencilState(prev_dss, prev_stencil);
+      d3d_ctx->PSSetShaderResources(0U, 1U, prev_srv.data());
+      d3d_ctx->PSSetSamplers(0U, 1U, prev_samp.data());
+      d3d_ctx->PSSetConstantBuffers(0U, 1U, prev_cb.data());
 
-    ++impl_->frames_processed;
-    if (dims.easu_active) {
-      ++impl_->easu_passes;
-    }
-    if (dims.rcas_active) {
-      ++impl_->rcas_passes;
+      for (auto*& rtv : prev_rtvs) {
+        safe_release(rtv);
+      }
+      safe_release(prev_dsv);
+      safe_release(prev_rs);
+      safe_release(prev_vs);
+      safe_release(prev_ps);
+      safe_release(prev_gs);
+      safe_release(prev_hs);
+      safe_release(prev_ds);
+      safe_release(prev_il);
+      safe_release(prev_blend);
+      safe_release(prev_dss);
+      safe_release(prev_srv[0]);
+      safe_release(prev_samp[0]);
+      safe_release(prev_cb[0]);
+      back_rtv->Release();
+
+      ++impl_->frames_processed;
+      if (dims.easu_active) {
+        ++impl_->easu_passes;
+      }
+      if (dims.rcas_active) {
+        ++impl_->rcas_passes;
+      }
     }
   }
 

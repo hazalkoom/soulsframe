@@ -58,20 +58,20 @@ IN-GAME HOTKEYS (NO GAME RESTART NEEDED)
 Default hotkeys work while playing (when modules.overlay = true and
 [hotkeys] enabled = true in soulsframe.toml):
 
-  F9   -- Show or hide the FPS counter and hotkey status box.
+  F9   (or Numpad9 / Ctrl+5) -- Show or hide the FPS counter & HUD.
 
-  F10  -- Master ON/OFF switch (pause or resume ALL mod optimizations
-          live so you can compare before vs after FPS instantly;
+  F10  (or Numpad0 / Ctrl+1) -- Master ON/OFF switch (pause or resume
+          ALL mod optimizations live without restarting the game;
           HUD displays PAUSED).
 
-  F11  -- Toggle FSR 1 upscaling & sharpening ON/OFF live
-          (works when modules.upscaler = true, e.g. low-end-gpu.toml).
+  F11  (or Numpad1 / Ctrl+2) -- Toggle FSR 1 upscaling & sharpening
+          ON/OFF live.
 
-  F8   -- Toggle particle lag reduction ON/OFF live
-          (works when modules.particles = true, e.g. low-end-gpu.toml).
+  F8   (or Numpad8 / Ctrl+3) -- Toggle particle overdraw reduction
+          ON/OFF live.
 
-  F12  -- Toggle the FPS cap (present.max_fps) ON/OFF live
-          (works when modules.presentation = true and max_fps > 0).
+  F12  (or Numpad2 / Ctrl+4) -- Toggle the FPS cap (present.max_fps,
+          60 FPS by default) ON/OFF live.
 
 
 ----------------------------------------------------------------------

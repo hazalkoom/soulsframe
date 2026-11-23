@@ -23,7 +23,9 @@ public:
   ~PresentationModule() override;
 
   const char* name() const override { return "presentation"; }
-  bool is_enabled(const sf::Config& cfg) const override { return cfg.modules.presentation; }
+  bool is_enabled(const sf::Config& cfg) const override {
+    return cfg.modules.presentation || (cfg.modules.overlay && cfg.hotkeys.enabled);
+  }
   bool init(const sf::GameProfile& profile, const sf::Config& cfg) override;
   void on_present(sf::PresentCtx& ctx) override;
   void shutdown() override;
@@ -32,5 +34,11 @@ private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };
+
+/// Returns true while the `CreateSwapChain` flip-model upgrade is active on DXGI.
+bool is_flip_model_active() noexcept;
+
+/// Returns true while `DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING` was enabled on the flip swapchain.
+bool is_tearing_flag_active() noexcept;
 
 } // namespace sf::gfx
