@@ -36,6 +36,15 @@ smoke:
 package tag="v1.0.0":
     bash scripts/package-release.sh {{tag}} out/release
 
+context:
+    bash scripts/dev/context.sh
+
+verify mode="--quick":
+    bash scripts/dev/verify.sh {{mode}}
+
+inspect-log file="build/win64-release/soulsframe-overlay.log":
+    python3 tools/py/inspect_log.py {{file}}
+
 deploy preset="win64-release":
     cp "build/{{preset}}/dinput8.dll" "{{ds3}}/dinput8.dll"
     @echo "Steam launch option: WINEDLLOVERRIDES=\"dinput8=n,b\" %command%"

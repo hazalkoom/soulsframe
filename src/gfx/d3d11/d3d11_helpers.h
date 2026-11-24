@@ -38,8 +38,8 @@ inline ID3D11RenderTargetView* create_backbuffer_rtv(ID3D11Device* dev, ID3D11Te
   if (resolved != DXGI_FORMAT_UNKNOWN) {
     D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
     rtv_desc.Format = resolved;
-    rtv_desc.ViewDimension =
-        (desc.SampleDesc.Count > 1U) ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
+    rtv_desc.ViewDimension = (desc.SampleDesc.Count > 1U) ? D3D11_RTV_DIMENSION_TEXTURE2DMS
+                                                          : D3D11_RTV_DIMENSION_TEXTURE2D;
     if (SUCCEEDED(dev->CreateRenderTargetView(back, &rtv_desc, &rtv))) {
       return rtv;
     }
