@@ -14,6 +14,7 @@ namespace {
 FILE* g_file = nullptr;
 std::mutex g_mu;
 std::atomic<uint8_t> g_min_level{static_cast<uint8_t>(Level::Info)};
+ULONGLONG g_start_tick_ms = 0ULL;
 
 const char* level_tag(Level lvl) noexcept {
   switch (lvl) {
@@ -37,7 +38,11 @@ void vwrite_level(Level lvl, const char* fmt, va_list ap) {
   if (!g_file) {
     return;
   }
-  std::fputs(level_tag(lvl), g_file);
+  const ULONGLONG now_ms = GetTickCount64();
+  const double elapsed_s =
+      (now_ms >= g_start_tick_ms) ? static_cast<double>(now_ms - g_start_tick_ms) / 1000.0 : 0.0;
+  std::fprintf(g_file, "[+%07.3fs][T:%04lx] %s", elapsed_s,
+               static_cast<unsigned long>(GetCurrentThreadId()), level_tag(lvl));
   std::vfprintf(g_file, fmt, ap);
   std::fputc('\n', g_file);
   std::fflush(g_file);
@@ -89,6 +94,7 @@ void init(void* module_handle) {
     g_file = nullptr;
   }
   g_min_level.store(static_cast<uint8_t>(Level::Info), std::memory_order_relaxed);
+  g_start_tick_ms = GetTickCount64();
   std::string log_path = module_dir(module_handle) + "\\soulsframe.log";
   g_file = std::fopen(log_path.c_str(), "w");
 }
