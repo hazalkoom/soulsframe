@@ -2,6 +2,7 @@
 
 #include "core/log.h"
 #include "core/runtime_controls.h"
+#include "gfx/d3d11/d3d11_helpers.h"
 #include "gfx/fx/fsr1_math.h"
 
 #include <d3d11.h>
@@ -80,50 +81,8 @@ float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
 }
 )";
 
-template <typename T> void safe_release(T*& ptr) noexcept {
-  if (ptr != nullptr) {
-    ptr->Release();
-    ptr = nullptr;
-  }
-}
-
 using D3DCompileFn = HRESULT(WINAPI*)(LPCVOID, SIZE_T, LPCSTR, const void*, void*, LPCSTR, LPCSTR,
                                       UINT, UINT, ID3DBlob**, ID3DBlob**);
-
-DXGI_FORMAT resolve_rtv_format(DXGI_FORMAT fmt) noexcept {
-  switch (fmt) {
-  case DXGI_FORMAT_R8G8B8A8_TYPELESS:
-    return DXGI_FORMAT_R8G8B8A8_UNORM;
-  case DXGI_FORMAT_B8G8R8A8_TYPELESS:
-    return DXGI_FORMAT_B8G8R8A8_UNORM;
-  case DXGI_FORMAT_R10G10B10A2_TYPELESS:
-    return DXGI_FORMAT_R10G10B10A2_UNORM;
-  case DXGI_FORMAT_R16G16B16A16_TYPELESS:
-    return DXGI_FORMAT_R16G16B16A16_FLOAT;
-  default:
-    return DXGI_FORMAT_UNKNOWN;
-  }
-}
-
-ID3D11RenderTargetView* create_backbuffer_rtv(ID3D11Device* dev, ID3D11Texture2D* back,
-                                              DXGI_FORMAT fmt) noexcept {
-  ID3D11RenderTargetView* rtv = nullptr;
-  const DXGI_FORMAT resolved = resolve_rtv_format(fmt);
-  if (resolved != DXGI_FORMAT_UNKNOWN) {
-    D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
-    rtv_desc.Format = resolved;
-    rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-    if (SUCCEEDED(dev->CreateRenderTargetView(back, &rtv_desc, &rtv))) {
-      return rtv;
-    }
-    safe_release(rtv);
-  }
-  if (SUCCEEDED(dev->CreateRenderTargetView(back, nullptr, &rtv))) {
-    return rtv;
-  }
-  safe_release(rtv);
-  return nullptr;
-}
 
 } // namespace
 
@@ -338,7 +297,7 @@ void UpscalerModule::on_present(sf::PresentCtx& ctx) {
   }
 
   if (impl_->ensure_shaders(dev) && impl_->ensure_targets(dev, back_desc)) {
-    ID3D11RenderTargetView* back_rtv = create_backbuffer_rtv(dev, back, back_desc.Format);
+    ID3D11RenderTargetView* back_rtv = create_backbuffer_rtv(dev, back, back_desc);
     if (back_rtv != nullptr) {
       const auto dims =
           fx::compute_upscale_dimensions(static_cast<uint32_t>(back_desc.Width),

@@ -90,6 +90,7 @@ jobs:
           python3 tools/py/analyze_capture.py --self-test
           python3 tools/py/plot_gpu_passes.py --self-test
           python3 tools/py/bake_textures.py --self-test
+          python3 tools/py/inspect_log.py --self-test
 
   static-analysis:
     if: needs.changes.outputs.heavy == 'true'

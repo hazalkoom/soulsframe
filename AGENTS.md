@@ -18,6 +18,10 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
 
 ## Build, format, and test commands
 
+- **AI context snapshot (fast, zero-deps):** `bash scripts/dev/context.sh` (or `just context`)
+- **Focused verification (`--quick` or `--full`):** `bash scripts/dev/verify.sh --quick` / `bash scripts/dev/verify.sh --full`
+- **Inspect runtime log (`soulsframe.log`):** `python3 tools/py/inspect_log.py <soulsframe.log> [--json]`
+  Runtime logs use `[+000.123s][T:01a4] [LEVEL] <message>` (elapsed seconds since init + hex Win32 thread ID + severity).
 - **Guards & layering check:** `bash scripts/ci/check-guards.sh`
 - **Host unit tests (native Linux):**
 
@@ -43,6 +47,7 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
   Run `x86_64-w64-mingw32-objdump -p build/win64-release/dinput8.dll`: must export `DirectInput8Create` and must not dynamically import `libstdc++`, `libgcc_s`, `libwinpthread`, or `minhook.x64.dll`.
 - **Format C++ code:** Run `clang-format -i` (using `.clang-format`) before committing.
 - **Wine smoke test:** `just smoke` (runs `scripts/smoke-test.sh` inside `sf-wine-test`).
+- **Package Windows release zip:** `just package` (or `bash scripts/package-release.sh v1.0.0 out/release`).
 
 ## Roadmap status (where we are)
 
@@ -52,8 +57,8 @@ Read [README.md](README.md), [docs/01-architecture-and-roadmap.md](docs/01-archi
 - **M4 (RE foundation):** **Implemented** — pure `pe_dump` & `sig_db` (Linux-tested, `ds3_sigs.toml` + RIP-relative resolver), read-only Win32 `win_dump` (`probe.dump_module`, Wine-verified), native `sftool` CLI, headless Ghidra `ExportSymbols.java`.
 - **M5–M8:** **Implemented** — flip-model + frame pacer, particle mitigation, FSR 1 upscaler, fixed-step FPS unlock research.
 - **M9 (Texture swap & bake):** **Implemented** — pure `texture_pack` (keys/DDS/manifest/budget), `TextureModule` `CreateTexture2D` hook, `tools/py/bake_textures.py`.
-- **M10 (Polish & release):** **Implemented (`v0.10.0-rc`)** — `version.h`, `config_diagnostics`, `sftool version`/`config-check`, `log_level` filtering, `on_resize()` cleanup, `config/presets/*.toml`, Windows validation guide, and release workflow hardening.
-- **M11 (In-game FPS viewer & live hotkeys):** **Implemented** — pure `runtime_controls` + 8x8 bitmap `hud_overlay`, D3D11 `OverlayModule`, and live toggles (`F9` HUD, `F10` master bypass, `F11` FSR 1, `F8` particles, `F12` FPS cap).
+- **M10 (Polish & release):** **Implemented** — `version.h`, `config_diagnostics`, `sftool version`/`config-check`, `log_level` filtering, `on_resize()` cleanup, `config/presets/*.toml`, Windows validation guide, and release workflow hardening.
+- **M11 (In-game FPS viewer & live hotkeys):** **Implemented (`v1.0.0`)** — pure `runtime_controls` + 8x8 bitmap `hud_overlay`, D3D11 `OverlayModule` (`WndProc` + `GetAsyncKeyState` hotkeys, transient per-frame RTVs), and live toggles (`F9` HUD, `F10` master bypass, `F11` FSR 1, `F8` particles, `F12` FPS cap).
 - **Next:** Real Windows 10/11 DS3 validation & A/B benchmarks.
 
 ## Commit & documentation workflow
